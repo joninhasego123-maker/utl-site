@@ -2418,3 +2418,9 @@ if (modal) {
   await loadData();
 
 })();
+(async function init() {
+  await checkAdmin();
+  await loadData();
+})();
+
+alert("APP.JS FUNCIONANDO");
