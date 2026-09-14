@@ -6,6 +6,8 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const DATA_FILE = path.join(__dirname, "data.json");
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -15,38 +17,78 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000
+      secure: false,
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24
     }
   })
 );
 
 app.use(express.static(path.join(__dirname, "public")));
 
-const DATA_FILE = path.join(__dirname, "data.json");
+/* =========================
+   BANCO DE DADOS
+========================= */
 
 const defaultData = {
   links: {
-    discord: "https://discord.gg/",
-    tiktok: "https://tiktok.com/"
+    discord: "",
+    tiktok: ""
   },
+
   tableUrl: "",
-  categories: ["Geral"],
+
+  categories: [
+    {
+      id: "geral",
+      name: "Geral"
+    }
+  ],
+
   news: [],
+
   players: [],
-  selections: [],
-  teams: []
+
+  teams: [],
+
+  selections: []
 };
 
 function loadData() {
   try {
     if (!fs.existsSync(DATA_FILE)) {
-      fs.writeFileSync(DATA_FILE, JSON.stringify(defaultData, null, 2));
+      fs.writeFileSync(
+        DATA_FILE,
+        JSON.stringify(defaultData, null, 2)
+      );
+
       return JSON.parse(JSON.stringify(defaultData));
     }
 
-    return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+    const file = fs.readFileSync(DATA_FILE, "utf8");
+
+    if (!file.trim()) {
+      return JSON.parse(JSON.stringify(defaultData));
+    }
+
+    const data = JSON.parse(file);
+
+    return {
+      ...defaultData,
+      ...data,
+      links: {
+        ...defaultData.links,
+        ...(data.links || {})
+      },
+      categories: data.categories || [],
+      news: data.news || [],
+      players: data.players || [],
+      teams: data.teams || [],
+      selections: data.selections || []
+    };
   } catch (error) {
-    console.error("Erro ao carregar dados:", error);
+    console.error("Erro ao carregar data.json:", error);
+
     return JSON.parse(JSON.stringify(defaultData));
   }
 }
@@ -54,8 +96,15 @@ function loadData() {
 let data = loadData();
 
 function saveData() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  fs.writeFileSync(
+    DATA_FILE,
+    JSON.stringify(data, null, 2)
+  );
 }
+
+/* =========================
+   ADMIN
+========================= */
 
 function requireAdmin(req, res, next) {
   if (!req.session.isAdmin) {
@@ -67,98 +116,38 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-const wages = {
-  "D": "75K",
-  "C-": "85K",
-  "C": "90K",
-  "C+": "100K",
-  "B-": "125K",
-  "B": "150K",
-  "B+": "175K",
-  "A-": "200K",
-  "A": "250K",
-  "A+": "275K",
-  "S-": "300K",
-  "S": "325K",
-  "S+": "350K"
-};
-
-function getWage(playerClass) {
-  if (playerClass === "X") {
-    return "380K–400K";
-  }
-
-  return wages[playerClass] || "—";
-}
-
-/* =========================
-   DADOS PÚBLICOS
-========================= */
-
-app.get("/api/data", (req, res) => {
-  res.json(data);
-});
-
-app.get("/api/classes", (req, res) => {
-  res.json({
-    classes: [
-      {
-        name: "X",
-        color: "purple",
-        subclasses: ["X"]
-      },
-      {
-        name: "S",
-        color: "blue",
-        subclasses: ["S+", "S", "S-"]
-      },
-      {
-        name: "A",
-        color: "red",
-        subclasses: ["A+", "A", "A-"]
-      },
-      {
-        name: "B",
-        color: "orange",
-        subclasses: ["B+", "B", "B-"]
-      },
-      {
-        name: "C",
-        color: "yellow",
-        subclasses: ["C+", "C", "C-"]
-      },
-      {
-        name: "D",
-        color: "gray",
-        subclasses: ["D"]
-      }
-    ],
-    wages
-  });
-});
-
-/* =========================
-   LOGIN ADMIN
-========================= */
+/* LOGIN */
 
 app.post("/api/admin/login", (req, res) => {
-  const password = String(req.body.password || "");
+  const password = req.body.password;
 
   const adminPassword =
-    process.env.ADMIN_PASSWORD || "ultimatetcsleaguesite6742";
+    process.env.ADMIN_PASSWORD ||
+    "ultimatetcsleaguesite6742";
 
-  if (password !== adminPassword) {
-    return res.status(401).json({
-      error: "Senha incorreta"
+  if (password === adminPassword) {
+    req.session.isAdmin = true;
+
+    return res.json({
+      success: true
     });
   }
 
-  req.session.isAdmin = true;
-
-  res.json({
-    success: true
+  return res.status(401).json({
+    success: false,
+    error: "Senha incorreta"
   });
 });
+
+/* STATUS */
+
+app.get("/api/admin/status", (req, res) => {
+  res.json({
+    isAdmin: !!req.session.isAdmin
+  });
+});
+
+/* LOGOUT */
 
 app.post("/api/admin/logout", (req, res) => {
   req.session.destroy(() => {
@@ -168,10 +157,12 @@ app.post("/api/admin/logout", (req, res) => {
   });
 });
 
-app.get("/api/admin/status", (req, res) => {
-  res.json({
-    isAdmin: !!req.session.isAdmin
-  });
+/* =========================
+   DADOS PÚBLICOS
+========================= */
+
+app.get("/api/data", (req, res) => {
+  res.json(data);
 });
 
 /* =========================
@@ -202,106 +193,195 @@ app.put("/api/admin/table", requireAdmin, (req, res) => {
   saveData();
 
   res.json({
-    success: true
+    success: true,
+    tableUrl: data.tableUrl
   });
 });
 
 /* =========================
-   CATEGORIAS
+   CATEGORIAS DE NOTÍCIAS
 ========================= */
 
-app.post("/api/admin/categories", requireAdmin, (req, res) => {
-  const name = String(req.body.name || "").trim();
+app.post(
+  "/api/admin/categories",
+  requireAdmin,
+  (req, res) => {
+    const name = String(req.body.name || "").trim();
 
-  if (!name) {
-    return res.status(400).json({
-      error: "Nome obrigatório"
+    if (!name) {
+      return res.status(400).json({
+        error: "Nome da categoria obrigatório"
+      });
+    }
+
+    const category = {
+      id:
+        Date.now().toString() +
+        Math.random().toString(36).slice(2, 7),
+
+      name
+    };
+
+    data.categories.push(category);
+
+    saveData();
+
+    res.json({
+      success: true,
+      category
     });
   }
+);
 
-  if (!data.categories.includes(name)) {
-    data.categories.push(name);
+app.delete(
+  "/api/admin/categories/:id",
+  requireAdmin,
+  (req, res) => {
+    const id = req.params.id;
+
+    data.categories = data.categories.filter(
+      category => category.id !== id
+    );
+
+    /*
+      Notícias dessa categoria passam para
+      nenhuma categoria.
+    */
+
+    data.news = data.news.map(news => {
+      if (news.categoryId === id) {
+        return {
+          ...news,
+          categoryId: ""
+        };
+      }
+
+      return news;
+    });
+
     saveData();
+
+    res.json({
+      success: true
+    });
   }
-
-  res.json({
-    success: true,
-    categories: data.categories
-  });
-});
-
-app.delete("/api/admin/categories/:name", requireAdmin, (req, res) => {
-  const name = decodeURIComponent(req.params.name);
-
-  data.categories = data.categories.filter(
-    category => category !== name
-  );
-
-  saveData();
-
-  res.json({
-    success: true,
-    categories: data.categories
-  });
-});
+);
 
 /* =========================
    NOTÍCIAS
 ========================= */
 
-app.post("/api/admin/news", requireAdmin, (req, res) => {
-  const news = {
-    id: Date.now().toString(),
-    title: req.body.title || "",
-    description: req.body.description || "",
-    image: req.body.image || "",
-    category: req.body.category || "Geral",
-    createdAt: new Date().toISOString()
-  };
+app.post(
+  "/api/admin/news",
+  requireAdmin,
+  (req, res) => {
+    const title = String(req.body.title || "").trim();
+    const description = String(
+      req.body.description || ""
+    ).trim();
 
-  data.news.unshift(news);
+    const image = String(
+      req.body.image || ""
+    ).trim();
 
-  saveData();
+    const categoryId = String(
+      req.body.categoryId || ""
+    ).trim();
 
-  res.json({
-    success: true,
-    news
-  });
-});
+    if (!title || !description) {
+      return res.status(400).json({
+        error: "Título e descrição são obrigatórios"
+      });
+    }
 
-app.put("/api/admin/news/:id", requireAdmin, (req, res) => {
-  const news = data.news.find(
-    item => String(item.id) === String(req.params.id)
-  );
+    const news = {
+      id:
+        Date.now().toString() +
+        Math.random().toString(36).slice(2, 7),
 
-  if (!news) {
-    return res.status(404).json({
-      error: "Notícia não encontrada"
+      title,
+      description,
+      image,
+      categoryId,
+
+      createdAt: new Date().toISOString()
+    };
+
+    data.news.unshift(news);
+
+    saveData();
+
+    res.json({
+      success: true,
+      news
     });
   }
+);
 
-  news.title = req.body.title ?? news.title;
-  news.description = req.body.description ?? news.description;
-  news.image = req.body.image ?? news.image;
-  news.category = req.body.category ?? news.category;
+app.delete(
+  "/api/admin/news/:id",
+  requireAdmin,
+  (req, res) => {
+    const id = req.params.id;
 
-  saveData();
+    data.news = data.news.filter(
+      news => news.id !== id
+    );
 
+    saveData();
+
+    res.json({
+      success: true
+    });
+  }
+);
+
+/* =========================
+   CLASSES E SALÁRIOS
+========================= */
+
+const wageTable = {
+  "D": "75K",
+
+  "C-": "85K",
+  "C": "90K",
+  "C+": "100K",
+
+  "B-": "125K",
+  "B": "150K",
+  "B+": "175K",
+
+  "A-": "200K",
+  "A": "250K",
+  "A+": "275K",
+
+  "S-": "300K",
+  "S": "325K",
+  "S+": "350K",
+
+  "X": "380K-400K"
+};
+
+app.get("/api/classes", (req, res) => {
   res.json({
-    success: true,
-    news
-  });
-});
+    classes: [
+      "X",
+      "S+",
+      "S",
+      "S-",
+      "A+",
+      "A",
+      "A-",
+      "B+",
+      "B",
+      "B-",
+      "C+",
+      "C",
+      "C-",
+      "D"
+    ],
 
-app.delete("/api/admin/news/:id", requireAdmin, (req, res) => {
-  data.news = data.news.filter(
-    item => String(item.id) !== String(req.params.id)
-  );
-
-  saveData();
-
-  res.json({
-    success: true
+    wages: wageTable
   });
 });
 
@@ -309,249 +389,477 @@ app.delete("/api/admin/news/:id", requireAdmin, (req, res) => {
    JOGADORES
 ========================= */
 
-app.post("/api/admin/players", requireAdmin, (req, res) => {
-  const playerClass = String(
-    req.body.class || req.body.classe || "D"
-  ).toUpperCase();
+/*
+  IMPORTANTE:
+  Essa rota vem ANTES de /:id
+  para não ser interpretada como um ID.
+*/
 
-  const player = {
-    id: Date.now().toString(),
-    nick: req.body.nick || req.body.name || "Sem nome",
-    class: playerClass,
-    teamId: req.body.teamId || "",
-    teamLogo: req.body.teamLogo || "",
-    freeAgent:
-      req.body.freeAgent === true ||
-      req.body.freeAgent === "true",
-    wage: getWage(playerClass)
-  };
+app.put(
+  "/api/admin/players/reorder",
+  requireAdmin,
+  (req, res) => {
+    const orderedIds = req.body.orderedIds;
 
-  data.players.push(player);
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({
+        error: "orderedIds precisa ser uma lista"
+      });
+    }
 
-  saveData();
+    const playersById = new Map(
+      data.players.map(player => [
+        player.id,
+        player
+      ])
+    );
 
-  res.json({
-    success: true,
-    player
-  });
-});
+    const reordered = [];
 
-app.put("/api/admin/players/:id", requireAdmin, (req, res) => {
-  const player = data.players.find(
-    item => String(item.id) === String(req.params.id)
-  );
+    for (const id of orderedIds) {
+      if (playersById.has(id)) {
+        reordered.push(playersById.get(id));
+        playersById.delete(id);
+      }
+    }
 
-  if (!player) {
-    return res.status(404).json({
-      error: "Jogador não encontrado"
+    /*
+      Mantém jogadores que não estavam
+      na lista enviada.
+    */
+
+    for (const player of playersById.values()) {
+      reordered.push(player);
+    }
+
+    data.players = reordered;
+
+    saveData();
+
+    res.json({
+      success: true,
+      players: data.players
     });
   }
+);
 
-  if (req.body.nick !== undefined) {
-    player.nick = req.body.nick;
-  }
+/* CRIAR JOGADOR */
 
-  if (req.body.class !== undefined) {
-    player.class = String(req.body.class).toUpperCase();
-    player.wage = getWage(player.class);
-  }
+app.post(
+  "/api/admin/players",
+  requireAdmin,
+  (req, res) => {
+    const nick = String(
+      req.body.nick || ""
+    ).trim();
 
-  if (req.body.teamId !== undefined) {
-    player.teamId = req.body.teamId;
-  }
+    const playerClass = String(
+      req.body.class || ""
+    ).trim();
 
-  if (req.body.teamLogo !== undefined) {
-    player.teamLogo = req.body.teamLogo;
-  }
+    const teamId = String(
+      req.body.teamId || ""
+    ).trim();
 
-  if (req.body.freeAgent !== undefined) {
-    player.freeAgent =
-      req.body.freeAgent === true ||
-      req.body.freeAgent === "true";
-  }
+    const freeAgent =
+      !!req.body.freeAgent;
 
-  saveData();
+    if (!nick) {
+      return res.status(400).json({
+        error: "Nick obrigatório"
+      });
+    }
 
-  res.json({
-    success: true,
-    player
-  });
-});
+    if (!wageTable[playerClass]) {
+      return res.status(400).json({
+        error: "Classe inválida"
+      });
+    }
 
-app.delete("/api/admin/players/:id", requireAdmin, (req, res) => {
-  data.players = data.players.filter(
-    item => String(item.id) !== String(req.params.id)
-  );
+    const player = {
+      id:
+        Date.now().toString() +
+        Math.random().toString(36).slice(2, 7),
 
-  saveData();
+      nick,
+      class: playerClass,
 
-  res.json({
-    success: true
-  });
-});
+      teamId:
+        freeAgent ? "" : teamId,
 
-/* =========================
-   REORGANIZAR JOGADORES
-========================= */
+      freeAgent,
 
-app.put("/api/admin/players/reorder", requireAdmin, (req, res) => {
-  const order = Array.isArray(req.body.order)
-    ? req.body.order.map(String)
-    : [];
+      wage: wageTable[playerClass]
+    };
 
-  const positions = new Map(
-    order.map((id, index) => [id, index])
-  );
+    data.players.push(player);
 
-  data.players.sort((a, b) => {
-    const aPos = positions.has(String(a.id))
-      ? positions.get(String(a.id))
-      : 999999;
+    saveData();
 
-    const bPos = positions.has(String(b.id))
-      ? positions.get(String(b.id))
-      : 999999;
-
-    return aPos - bPos;
-  });
-
-  saveData();
-
-  res.json({
-    success: true
-  });
-});
-
-/* =========================
-   SELEÇÕES
-========================= */
-
-app.post("/api/admin/selections", requireAdmin, (req, res) => {
-  const selection = {
-    id: Date.now().toString(),
-    name: req.body.name || "",
-    logo: req.body.logo || "",
-    players: Array.isArray(req.body.players)
-      ? req.body.players
-      : []
-  };
-
-  data.selections.push(selection);
-
-  saveData();
-
-  res.json({
-    success: true,
-    selection
-  });
-});
-
-app.put("/api/admin/selections/:id", requireAdmin, (req, res) => {
-  const selection = data.selections.find(
-    item => String(item.id) === String(req.params.id)
-  );
-
-  if (!selection) {
-    return res.status(404).json({
-      error: "Seleção não encontrada"
+    res.json({
+      success: true,
+      player
     });
   }
+);
 
-  selection.name = req.body.name ?? selection.name;
-  selection.logo = req.body.logo ?? selection.logo;
+/* EDITAR JOGADOR */
 
-  if (Array.isArray(req.body.players)) {
-    selection.players = req.body.players;
+app.put(
+  "/api/admin/players/:id",
+  requireAdmin,
+  (req, res) => {
+    const player = data.players.find(
+      player =>
+        player.id === req.params.id
+    );
+
+    if (!player) {
+      return res.status(404).json({
+        error: "Jogador não encontrado"
+      });
+    }
+
+    if (req.body.nick !== undefined) {
+      player.nick = String(
+        req.body.nick
+      ).trim();
+    }
+
+    if (req.body.class !== undefined) {
+      const newClass = String(
+        req.body.class
+      ).trim();
+
+      if (!wageTable[newClass]) {
+        return res.status(400).json({
+          error: "Classe inválida"
+        });
+      }
+
+      player.class = newClass;
+      player.wage = wageTable[newClass];
+    }
+
+    if (req.body.teamId !== undefined) {
+      player.teamId =
+        String(req.body.teamId || "");
+    }
+
+    if (req.body.freeAgent !== undefined) {
+      player.freeAgent =
+        !!req.body.freeAgent;
+
+      if (player.freeAgent) {
+        player.teamId = "";
+      }
+    }
+
+    saveData();
+
+    res.json({
+      success: true,
+      player
+    });
   }
+);
 
-  saveData();
+/* DELETAR JOGADOR */
 
-  res.json({
-    success: true,
-    selection
-  });
-});
+app.delete(
+  "/api/admin/players/:id",
+  requireAdmin,
+  (req, res) => {
+    const id = req.params.id;
 
-app.delete("/api/admin/selections/:id", requireAdmin, (req, res) => {
-  data.selections = data.selections.filter(
-    item => String(item.id) !== String(req.params.id)
-  );
+    data.players = data.players.filter(
+      player => player.id !== id
+    );
 
-  saveData();
+    /*
+      Também remove o jogador das
+      seleções e times.
+    */
 
-  res.json({
-    success: true
-  });
-});
+    data.teams = data.teams.map(team => ({
+      ...team,
+      playerIds: (team.playerIds || []).filter(
+        playerId => playerId !== id
+      )
+    }));
+
+    data.selections =
+      data.selections.map(selection => ({
+        ...selection,
+        playerIds:
+          (selection.playerIds || []).filter(
+            playerId => playerId !== id
+          )
+      }));
+
+    saveData();
+
+    res.json({
+      success: true
+    });
+  }
+);
 
 /* =========================
    TIMES
 ========================= */
 
-app.post("/api/admin/teams", requireAdmin, (req, res) => {
-  const team = {
-    id: Date.now().toString(),
-    name: req.body.name || "",
-    logo: req.body.logo || "",
-    players: Array.isArray(req.body.players)
-      ? req.body.players
-      : []
-  };
+/* CRIAR TIME */
 
-  data.teams.push(team);
+app.post(
+  "/api/admin/teams",
+  requireAdmin,
+  (req, res) => {
+    const name = String(
+      req.body.name || ""
+    ).trim();
 
-  saveData();
+    const logo = String(
+      req.body.logo || ""
+    ).trim();
 
-  res.json({
-    success: true,
-    team
-  });
-});
+    if (!name) {
+      return res.status(400).json({
+        error: "Nome do time obrigatório"
+      });
+    }
 
-app.put("/api/admin/teams/:id", requireAdmin, (req, res) => {
-  const team = data.teams.find(
-    item => String(item.id) === String(req.params.id)
-  );
+    const team = {
+      id:
+        Date.now().toString() +
+        Math.random().toString(36).slice(2, 7),
 
-  if (!team) {
-    return res.status(404).json({
-      error: "Time não encontrado"
+      name,
+      logo,
+
+      playerIds: []
+    };
+
+    data.teams.push(team);
+
+    saveData();
+
+    res.json({
+      success: true,
+      team
     });
   }
+);
 
-  team.name = req.body.name ?? team.name;
-  team.logo = req.body.logo ?? team.logo;
+/* EDITAR TIME */
 
-  if (Array.isArray(req.body.players)) {
-    team.players = req.body.players;
+app.put(
+  "/api/admin/teams/:id",
+  requireAdmin,
+  (req, res) => {
+    const team = data.teams.find(
+      team =>
+        team.id === req.params.id
+    );
+
+    if (!team) {
+      return res.status(404).json({
+        error: "Time não encontrado"
+      });
+    }
+
+    if (req.body.name !== undefined) {
+      team.name = String(
+        req.body.name
+      ).trim();
+    }
+
+    if (req.body.logo !== undefined) {
+      team.logo = String(
+        req.body.logo
+      ).trim();
+    }
+
+    if (Array.isArray(req.body.playerIds)) {
+      team.playerIds = req.body.playerIds;
+    }
+
+    saveData();
+
+    res.json({
+      success: true,
+      team
+    });
   }
+);
 
-  saveData();
+/* DELETAR TIME */
 
-  res.json({
-    success: true,
-    team
-  });
-});
+app.delete(
+  "/api/admin/teams/:id",
+  requireAdmin,
+  (req, res) => {
+    const id = req.params.id;
 
-app.delete("/api/admin/teams/:id", requireAdmin, (req, res) => {
-  data.teams = data.teams.filter(
-    item => String(item.id) !== String(req.params.id)
-  );
+    data.teams = data.teams.filter(
+      team => team.id !== id
+    );
 
-  saveData();
+    /*
+      Jogadores desse time ficam
+      como Free Agent.
+    */
 
-  res.json({
-    success: true
-  });
-});
+    data.players = data.players.map(
+      player => {
+        if (player.teamId === id) {
+          return {
+            ...player,
+            teamId: "",
+            freeAgent: true
+          };
+        }
+
+        return player;
+      }
+    );
+
+    saveData();
+
+    res.json({
+      success: true
+    });
+  }
+);
 
 /* =========================
-   ROTA PRINCIPAL
+   SELEÇÕES
 ========================= */
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+/* CRIAR SELEÇÃO */
+
+app.post(
+  "/api/admin/selections",
+  requireAdmin,
+  (req, res) => {
+    const name = String(
+      req.body.name || ""
+    ).trim();
+
+    const logo = String(
+      req.body.logo || ""
+    ).trim();
+
+    if (!name) {
+      return res.status(400).json({
+        error: "Nome da seleção obrigatório"
+      });
+    }
+
+    const selection = {
+      id:
+        Date.now().toString() +
+        Math.random().toString(36).slice(2, 7),
+
+      name,
+      logo,
+
+      playerIds: []
+    };
+
+    data.selections.push(selection);
+
+    saveData();
+
+    res.json({
+      success: true,
+      selection
+    });
+  }
+);
+
+/* EDITAR SELEÇÃO */
+
+app.put(
+  "/api/admin/selections/:id",
+  requireAdmin,
+  (req, res) => {
+    const selection =
+      data.selections.find(
+        selection =>
+          selection.id === req.params.id
+      );
+
+    if (!selection) {
+      return res.status(404).json({
+        error: "Seleção não encontrada"
+      });
+    }
+
+    if (req.body.name !== undefined) {
+      selection.name = String(
+        req.body.name
+      ).trim();
+    }
+
+    if (req.body.logo !== undefined) {
+      selection.logo = String(
+        req.body.logo
+      ).trim();
+    }
+
+    if (Array.isArray(req.body.playerIds)) {
+      selection.playerIds =
+        req.body.playerIds;
+    }
+
+    saveData();
+
+    res.json({
+      success: true,
+      selection
+    });
+  }
+);
+
+/* DELETAR SELEÇÃO */
+
+app.delete(
+  "/api/admin/selections/:id",
+  requireAdmin,
+  (req, res) => {
+    const id = req.params.id;
+
+    data.selections =
+      data.selections.filter(
+        selection =>
+          selection.id !== id
+      );
+
+    saveData();
+
+    res.json({
+      success: true
+    });
+  }
+);
+
+/* =========================
+   ROTA DO SITE
+========================= */
+
+/*
+  NÃO usar app.get("*") no Express 5.
+*/
+
+app.use((req, res) => {
+  res.sendFile(
+    path.join(
+      __dirname,
+      "public",
+      "index.html"
+    )
+  );
 });
 
 /* =========================
@@ -559,5 +867,7 @@ app.get("*", (req, res) => {
 ========================= */
 
 app.listen(PORT, () => {
-  console.log(`UTL Site rodando na porta ${PORT}`);
+  console.log(
+    `UTL Site rodando na porta ${PORT}`
+  );
 });
