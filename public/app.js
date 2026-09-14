@@ -298,3 +298,392 @@ function renderPage(page) {
       renderHome();
   }
 }
+/* =========================
+   HOME
+========================= */
+
+function renderHome() {
+  const latestNews = [...data.news]
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+    .slice(0, 3);
+
+  content.innerHTML = `
+    <section class="hero">
+
+      <img
+        src="/images/banner.png"
+        class="hero-banner"
+        alt="UTL Banner"
+        onerror="this.style.display='none'"
+      >
+
+      <div class="hero-content">
+
+        <img
+          src="/images/logo.png"
+          class="hero-logo"
+          alt="UTL"
+          onerror="this.style.display='none'"
+        >
+
+        <div>
+          <h1>ULTIMATE TCS LEAGUE</h1>
+          <p>A maior competição da UTL.</p>
+        </div>
+
+      </div>
+
+    </section>
+
+    <section class="stats-grid">
+
+      <div class="stat-card">
+        <strong>${data.players.length}</strong>
+        <span>Jogadores</span>
+      </div>
+
+      <div class="stat-card">
+        <strong>${data.teams.length}</strong>
+        <span>Times</span>
+      </div>
+
+      <div class="stat-card">
+        <strong>${data.selections.length}</strong>
+        <span>Seleções</span>
+      </div>
+
+      <div class="stat-card">
+        <strong>${data.news.length}</strong>
+        <span>Notícias</span>
+      </div>
+
+    </section>
+
+    <section class="section">
+
+      <div class="section-title">
+        <h2>Últimas notícias</h2>
+
+        <button
+          class="secondary-button"
+          data-page="news"
+        >
+          Ver todas
+        </button>
+      </div>
+
+      ${
+        latestNews.length
+          ? `
+            <div class="news-grid">
+              ${latestNews.map(newsCard).join("")}
+            </div>
+          `
+          : `
+            <div class="card empty">
+              <p>Nenhuma notícia publicada ainda.</p>
+            </div>
+          `
+      }
+
+    </section>
+  `;
+}
+
+
+/* =========================
+   OTHERS
+========================= */
+
+function renderOthers() {
+  const discord = data.links?.discord || "";
+  const tiktok = data.links?.tiktok || "";
+
+  content.innerHTML = `
+    <div class="page-header">
+      <h2>Others</h2>
+      <p>Links oficiais da ULTIMATE TCS LEAGUE.</p>
+    </div>
+
+    <div class="cards-grid">
+
+      ${
+        discord
+          ? `
+            <a
+              class="link-card"
+              href="${escapeHTML(discord)}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+
+              <div class="link-icon">
+                💬
+              </div>
+
+              <div>
+                <h3>Discord</h3>
+                <p>Entre no servidor oficial da UTL.</p>
+              </div>
+
+            </a>
+          `
+          : ""
+      }
+
+      ${
+        tiktok
+          ? `
+            <a
+              class="link-card"
+              href="${escapeHTML(tiktok)}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+
+              <div class="link-icon">
+                🎵
+              </div>
+
+              <div>
+                <h3>TikTok</h3>
+                <p>Acompanhe a UTL no TikTok.</p>
+              </div>
+
+            </a>
+          `
+          : ""
+      }
+
+      ${
+        !discord && !tiktok
+          ? `
+            <div class="card empty">
+              <p>Nenhum link foi configurado.</p>
+            </div>
+          `
+          : ""
+      }
+
+    </div>
+  `;
+}
+
+
+/* =========================
+   NEWS
+========================= */
+
+function newsCard(news) {
+  const category = data.categories.find(
+    cat => String(cat.id) === String(news.categoryId)
+  );
+
+  return `
+    <article class="news-card">
+
+      ${
+        news.image
+          ? `
+            <img
+              src="${escapeHTML(news.image)}"
+              alt="${escapeHTML(news.title)}"
+            >
+          `
+          : `
+            <div class="news-placeholder">
+              UTL
+            </div>
+          `
+      }
+
+      <div class="news-card-body">
+
+        ${
+          category
+            ? `
+              <span class="category-tag">
+                ${escapeHTML(category.name)}
+              </span>
+            `
+            : ""
+        }
+
+        <h3>
+          ${escapeHTML(news.title)}
+        </h3>
+
+        <p>
+          ${escapeHTML(news.description)}
+        </p>
+
+        ${
+          isAdmin
+            ? `
+              <button
+                class="danger-button small"
+                data-delete-news="${escapeHTML(news.id)}"
+              >
+                Excluir
+              </button>
+            `
+            : ""
+        }
+
+      </div>
+
+    </article>
+  `;
+}
+
+
+function renderNews() {
+  const categories = data.categories || [];
+
+  content.innerHTML = `
+    <div class="page-header">
+      <h2>Notícias</h2>
+      <p>
+        Confira as novidades da ULTIMATE TCS LEAGUE.
+      </p>
+    </div>
+
+    ${
+      categories.length
+        ? `
+          <div class="category-filter">
+
+            <button
+              class="category-button active"
+              data-news-category="all"
+            >
+              Todas
+            </button>
+
+            ${categories.map(category => `
+              <button
+                class="category-button"
+                data-news-category="${escapeHTML(category.id)}"
+              >
+                ${escapeHTML(category.name)}
+              </button>
+            `).join("")}
+
+          </div>
+        `
+        : ""
+    }
+
+    <div
+      id="news-list"
+      class="news-grid"
+    >
+
+      ${
+        data.news.length
+          ? data.news.map(newsCard).join("")
+          : `
+            <div class="card empty">
+              <p>Nenhuma notícia publicada.</p>
+            </div>
+          `
+      }
+
+    </div>
+  `;
+}
+
+
+function filterNews(categoryId) {
+  const container =
+    document.getElementById("news-list");
+
+  if (!container) return;
+
+  const filtered =
+    categoryId === "all"
+      ? data.news
+      : data.news.filter(
+          news =>
+            String(news.categoryId) ===
+            String(categoryId)
+        );
+
+  container.innerHTML =
+    filtered.length
+      ? filtered.map(newsCard).join("")
+      : `
+        <div class="card empty">
+          <p>Nenhuma notícia nessa categoria.</p>
+        </div>
+      `;
+
+  document
+    .querySelectorAll("[data-news-category]")
+    .forEach(button => {
+
+      button.classList.toggle(
+        "active",
+        button.dataset.newsCategory === categoryId
+      );
+
+    });
+}
+
+
+/* =========================
+   TABELA
+========================= */
+
+function renderTable() {
+
+  content.innerHTML = `
+    <div class="page-header">
+      <h2>Tabela</h2>
+      <p>
+        Classificação oficial da competição.
+      </p>
+    </div>
+
+    ${
+      data.tableUrl
+        ? `
+          <div class="table-frame-card">
+
+            <a
+              class="primary-button"
+              href="${escapeHTML(data.tableUrl)}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Abrir tabela
+            </a>
+
+            <div class="table-iframe-wrapper">
+
+              <iframe
+                src="${escapeHTML(data.tableUrl)}"
+                title="Tabela UTL"
+                loading="lazy"
+              ></iframe>
+
+            </div>
+
+          </div>
+        `
+        : `
+          <div class="card empty">
+
+            <h3>
+              Tabela ainda não configurada
+            </h3>
+
+            <p>
+              O administrador ainda não adicionou o link.
+            </p>
+
+          </div>
+        `
+    }
+  `;
+}
