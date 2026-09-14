@@ -6,30 +6,13 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const DATA_FILE = path.join(__dirname, "data.json");
+
 const ADMIN_PASSWORD =
   process.env.ADMIN_PASSWORD || "ultimatetcsleaguesite6742";
 
 const SESSION_SECRET =
-  process.env.SESSION_SECRET || "utl-session-secret";
-
-const DATA_FILE = path.join(__dirname, "data.json");
-
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true }));
-
-app.use(
-  session({
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24
-    }
-  })
-);
+  process.env.SESSION_SECRET || "utl-session-secret-2026";
 
 const CLASS_ORDER = [
   "X",
@@ -48,19 +31,32 @@ const CLASS_ORDER = [
   "D"
 ];
 
-const WAGES = {
+const CLASS_GROUPS = [
+  "X",
+  "S",
+  "A",
+  "B",
+  "C",
+  "D"
+];
+
+const FIXED_WAGES = {
   "S+": 350000,
   "S": 325000,
   "S-": 300000,
+
   "A+": 275000,
   "A": 250000,
   "A-": 200000,
+
   "B+": 175000,
   "B": 150000,
   "B-": 125000,
+
   "C+": 100000,
   "C": 90000,
   "C-": 85000,
+
   "D": 75000
 };
 
@@ -78,6 +74,29 @@ const ROLES = [
   "MANAGER"
 ];
 
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+app.use(
+  session({
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 1000 * 60 * 60 * 24
+    }
+  })
+);
+
+app.use(express.static(path.join(__dirname, "public")));
+
+/* =========================
+   DATA
+========================= */
+
 function defaultData() {
   return {
     links: {
@@ -85,44 +104,41 @@ function defaultData() {
       tiktok: "",
       tabela: ""
     },
-    newsCategories: ["Geral"],
+
+    newsCategories: [
+      "Geral"
+    ],
+
     news: [],
+
     players: [],
+
     selections: [],
+
     teams: []
   };
 }
 
 function loadData() {
+  if (!fs.existsSync(DATA_FILE)) {
+    const data = defaultData();
+    saveData(data);
+    return data;
+  }
+
   try {
-    if (!fs.existsSync(DATA_FILE)) {
-      const data = defaultData();
-      saveData(data);
-      return data;
-    }
+    const raw = fs.readFileSync(
+      DATA_FILE,
+      "utf8"
+    );
 
-    const data = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+    const parsed = JSON.parse(raw);
 
-    return {
-      links: data.links || {
-        discord: "",
-        tiktok: "",
-        tabela: ""
-      },
-      newsCategories:
-        Array.isArray(data.newsCategories) && data.newsCategories.length
-          ? data.newsCategories
-          : ["Geral"],
-      news: Array.isArray(data.news) ? data.news : [],
-      players: Array.isArray(data.players) ? data.players : [],
-      selections: Array.isArray(data.selections)
-        ? data.selections
-        : [],
-      teams: Array.isArray(data.teams) ? data.teams : []
-    };
-  } catch (error) {
-    console.error("Erro ao carregar data.json:", error);
-    return defaultData();
+    return normalizeData(parsed);
+  } catch {
+    const data = defaultData();
+    saveData(data);
+    return data;
   }
 }
 
@@ -134,10 +150,227 @@ function saveData(data) {
   );
 }
 
+function normalizeData(data) {
+  const base = defaultData();
+
+  data = data || {};
+
+  const normalized = {
+    links: {
+      ...base.links,
+      ...(data.links || {})
+    },
+
+    newsCategories:
+      Array.isArray(data.newsCategories)
+        ? data.newsCategories
+        : ["Geral"],
+
+    news:
+      Array.isArray(data.news)
+        ? data.news
+        : [],
+
+    players:
+      Array.isArray(data.players)
+        ? data.players
+        : [],
+
+    selections:
+      Array.isArray(data.selections)
+        ? data.selections
+        : [],
+
+    teams:
+      Array.isArray(data.teams)
+        ? data.teams
+        : []
+  };
+
+  if (
+    !normalized.newsCategories.includes("Geral")
+  ) {
+    normalized.newsCategories.unshift("Geral");
+  }
+
+  normalized.news = normalized.news.map(
+    normalizeNews
+  );
+
+  normalized.players = normalized.players.map(
+    normalizePlayer
+  );
+
+  normalized.teams = normalized.teams.map(
+    normalizeTeam
+  );
+
+  normalized.selections =
+    normalized.selections.map(
+      normalizeSelection
+    );
+
+  return normalized;
+}
+
 let DATA = loadData();
 
+saveData(DATA);
+
+/* =========================
+   NORMALIZATION
+========================= */
+
+function normalizeNews(news) {
+  return {
+    id:
+      news.id ||
+      Date.now() +
+        Math.floor(Math.random() * 1000),
+
+    category:
+      DATA.newsCategories.includes(
+        news.category
+      )
+        ? news.category
+        : "Geral",
+
+    title:
+      String(news.title || "").trim(),
+
+    description:
+      String(news.description || "").trim(),
+
+    image:
+      String(news.image || "").trim(),
+
+    createdAt:
+      Number(news.createdAt) ||
+      Date.now()
+  };
+}
+
+function normalizePlayer(player) {
+  const cls = CLASS_ORDER.includes(
+    String(player.class || "").toUpperCase()
+  )
+    ? String(player.class).toUpperCase()
+    : "D";
+
+  let wage;
+
+  if (cls === "X") {
+    const oldWage = Number(player.wage);
+
+    wage = X_WAGES.includes(oldWage)
+      ? oldWage
+      : 380000;
+  } else {
+    wage = FIXED_WAGES[cls];
+  }
+
+  let role = String(
+    player.role || "PLAYER"
+  ).toUpperCase();
+
+  if (!ROLES.includes(role)) {
+    role = "PLAYER";
+  }
+
+  let overall = Number(player.overall);
+
+  if (!Number.isFinite(overall)) {
+    overall = 0;
+  }
+
+  overall = Math.max(
+    0,
+    Math.min(100, Math.round(overall))
+  );
+
+  return {
+    id: Number(player.id),
+
+    nick:
+      String(player.nick || "").trim(),
+
+    class: cls,
+
+    wage,
+
+    teamId:
+      player.teamId
+        ? String(player.teamId)
+        : null,
+
+    role,
+
+    overall,
+
+    createdAt:
+      Number(player.createdAt) ||
+      Date.now()
+  };
+}
+
+function normalizeTeam(team) {
+  return {
+    id:
+      String(
+        team.id ||
+        `team_${Date.now()}_${Math.random()
+          .toString(36)
+          .slice(2, 8)}`
+      ),
+
+    name:
+      String(team.name || "").trim(),
+
+    color:
+      String(team.color || "#171717"),
+
+    logo:
+      String(team.logo || "").trim()
+  };
+}
+
+function normalizeSelection(selection) {
+  return {
+    id:
+      String(
+        selection.id ||
+        `selection_${Date.now()}_${Math.random()
+          .toString(36)
+          .slice(2, 8)}`
+      ),
+
+    name:
+      String(selection.name || "").trim(),
+
+    color:
+      String(
+        selection.color || "#171717"
+      ),
+
+    logo:
+      String(selection.logo || "").trim(),
+
+    players:
+      Array.isArray(selection.players)
+        ? selection.players
+            .map(Number)
+            .filter(Number.isFinite)
+            .slice(0, 16)
+        : []
+  };
+}
+
+/* =========================
+   HELPERS
+========================= */
+
 function adminOnly(req, res, next) {
-  if (!req.session.isAdmin) {
+  if (!req.session.admin) {
     return res.status(401).json({
       error: "Não autorizado."
     });
@@ -146,170 +379,144 @@ function adminOnly(req, res, next) {
   next();
 }
 
-function clean(value) {
-  return String(value ?? "").trim();
-}
-
-function validClass(value) {
-  return CLASS_ORDER.includes(value);
-}
-
-function validRole(value) {
-  return ROLES.includes(value);
-}
-
-function getPlayerClass(player) {
-  return player.class || "D";
-}
-
-function getPlayerWage(player) {
-  const playerClass = getPlayerClass(player);
-
-  if (playerClass === "X") {
-    const wage = Number(player.wage);
-
-    if (X_WAGES.includes(wage)) {
-      return wage;
-    }
-
-    return 380000;
-  }
-
-  return WAGES[playerClass] || 75000;
-}
-
-function normalizePlayer(player, index = 0) {
-  const playerClass = validClass(player.class)
-    ? player.class
-    : "D";
-
-  const role = validRole(player.role)
-    ? player.role
-    : "PLAYER";
-
-  let wage = getPlayerWage({
-    ...player,
-    class: playerClass
-  });
-
-  if (playerClass === "X" && !X_WAGES.includes(Number(player.wage))) {
-    wage = 380000;
-  }
-
-  return {
-    id: clean(player.id),
-    nick: clean(player.nick),
-    class: playerClass,
-    overall: Math.max(
-      0,
-      Math.min(100, Number(player.overall) || 0)
-    ),
-    teamId: clean(player.teamId || player.team || ""),
-    role,
-    wage,
-    freeAgent:
-      !clean(player.teamId || player.team),
-    order:
-      Number.isFinite(Number(player.order))
-        ? Number(player.order)
-        : index
-  };
-}
-
-function normalizePlayers() {
-  DATA.players = DATA.players.map(normalizePlayer);
-
-  DATA.players.sort((a, b) => {
-    const classA = CLASS_ORDER.indexOf(a.class);
-    const classB = CLASS_ORDER.indexOf(b.class);
-
-    if (classA !== classB) {
-      return classA - classB;
-    }
-
-    return a.order - b.order;
-  });
-
-  DATA.players.forEach((player, index) => {
-    player.order = index;
-  });
-}
-
-normalizePlayers();
-saveData(DATA);
-
-function makeId(prefix = "id") {
+function generateId(prefix) {
   return (
     prefix +
     "_" +
-    Date.now().toString(36) +
+    Date.now() +
     "_" +
-    Math.random().toString(36).slice(2, 8)
+    Math.random()
+      .toString(36)
+      .slice(2, 8)
+  );
+}
+
+function validUrl(value) {
+  if (!value) return true;
+
+  try {
+    const url = new URL(value);
+
+    return (
+      url.protocol === "http:" ||
+      url.protocol === "https:"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function cleanText(value, max = 500) {
+  return String(value || "")
+    .trim()
+    .slice(0, max);
+}
+
+function getTeam(teamId) {
+  return DATA.teams.find(
+    team =>
+      String(team.id) ===
+      String(teamId)
   );
 }
 
 /* =========================
-   PUBLIC API
+   PUBLIC DATA
 ========================= */
 
 app.get("/api/data", (req, res) => {
-  normalizePlayers();
-
   res.json(DATA);
 });
 
-app.get("/api/admin/status", (req, res) => {
-  res.json({
-    loggedIn: !!req.session.isAdmin
-  });
-});
+app.get(
+  "/api/admin/status",
+  (req, res) => {
+    res.json({
+      authenticated:
+        req.session.admin === true
+    });
+  }
+);
 
 /* =========================
    LOGIN
 ========================= */
 
-app.post("/api/admin/login", (req, res) => {
-  const password = clean(req.body.password);
+app.post(
+  "/api/admin/login",
+  (req, res) => {
+    const password =
+      String(req.body.password || "");
 
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({
-      error: "Senha incorreta."
-    });
-  }
+    if (
+      password !== ADMIN_PASSWORD
+    ) {
+      return res.status(401).json({
+        error: "Senha incorreta."
+      });
+    }
 
-  req.session.isAdmin = true;
+    req.session.admin = true;
 
-  res.json({
-    success: true
-  });
-});
-
-app.post("/api/admin/logout", (req, res) => {
-  req.session.destroy(() => {
     res.json({
       success: true
     });
-  });
-});
+  }
+);
+
+app.post(
+  "/api/admin/logout",
+  (req, res) => {
+    req.session.destroy(() => {
+      res.json({
+        success: true
+      });
+    });
+  }
+);
 
 /* =========================
    LINKS
 ========================= */
 
-app.put("/api/admin/links", adminOnly, (req, res) => {
-  DATA.links = {
-    discord: clean(req.body.discord),
-    tiktok: clean(req.body.tiktok),
-    tabela: clean(req.body.tabela)
-  };
+app.post(
+  "/api/admin/links",
+  adminOnly,
+  (req, res) => {
+    const discord =
+      cleanText(req.body.discord, 300);
 
-  saveData(DATA);
+    const tiktok =
+      cleanText(req.body.tiktok, 300);
 
-  res.json({
-    success: true,
-    links: DATA.links
-  });
-});
+    const tabela =
+      cleanText(req.body.tabela, 300);
+
+    if (
+      !validUrl(discord) ||
+      !validUrl(tiktok) ||
+      !validUrl(tabela)
+    ) {
+      return res.status(400).json({
+        error:
+          "Um dos links informados é inválido."
+      });
+    }
+
+    DATA.links = {
+      discord,
+      tiktok,
+      tabela
+    };
+
+    saveData(DATA);
+
+    res.json({
+      success: true,
+      links: DATA.links
+    });
+  }
+);
 
 /* =========================
    NEWS CATEGORIES
@@ -319,22 +526,27 @@ app.post(
   "/api/admin/news-categories",
   adminOnly,
   (req, res) => {
-    const name = clean(req.body.name);
+    const name =
+      cleanText(req.body.name, 40);
 
     if (!name) {
       return res.status(400).json({
-        error: "Informe o nome da categoria."
+        error:
+          "Informe o nome da categoria."
       });
     }
 
-    if (
+    const exists =
       DATA.newsCategories.some(
         category =>
-          category.toLowerCase() === name.toLowerCase()
-      )
-    ) {
+          category.toLowerCase() ===
+          name.toLowerCase()
+      );
+
+    if (exists) {
       return res.status(400).json({
-        error: "Essa categoria já existe."
+        error:
+          "Essa categoria já existe."
       });
     }
 
@@ -344,7 +556,8 @@ app.post(
 
     res.json({
       success: true,
-      categories: DATA.newsCategories
+      newsCategories:
+        DATA.newsCategories
     });
   }
 );
@@ -353,29 +566,48 @@ app.delete(
   "/api/admin/news-categories/:name",
   adminOnly,
   (req, res) => {
-    const name = decodeURIComponent(req.params.name);
+    const name =
+      decodeURIComponent(req.params.name);
 
     if (name === "Geral") {
       return res.status(400).json({
-        error: "A categoria Geral não pode ser excluída."
+        error:
+          "A categoria Geral não pode ser excluída."
       });
     }
 
-    DATA.newsCategories = DATA.newsCategories.filter(
-      category => category !== name
-    );
+    if (
+      !DATA.newsCategories.includes(name)
+    ) {
+      return res.status(404).json({
+        error:
+          "Categoria não encontrada."
+      });
+    }
 
-    DATA.news.forEach(news => {
+    DATA.newsCategories =
+      DATA.newsCategories.filter(
+        category => category !== name
+      );
+
+    DATA.news = DATA.news.map(news => {
       if (news.category === name) {
-        news.category = "Geral";
+        return {
+          ...news,
+          category: "Geral"
+        };
       }
+
+      return news;
     });
 
     saveData(DATA);
 
     res.json({
       success: true,
-      categories: DATA.newsCategories
+      newsCategories:
+        DATA.newsCategories,
+      news: DATA.news
     });
   }
 );
@@ -384,186 +616,310 @@ app.delete(
    NEWS
 ========================= */
 
-app.post("/api/admin/news", adminOnly, (req, res) => {
-  const title = clean(req.body.title);
-  const description = clean(req.body.description);
-  const image = clean(req.body.image);
-  const category = clean(req.body.category) || "Geral";
+app.post(
+  "/api/admin/news",
+  adminOnly,
+  (req, res) => {
+    const category =
+      cleanText(
+        req.body.category || "Geral",
+        40
+      );
 
-  if (!title || !description) {
-    return res.status(400).json({
-      error: "Título e descrição são obrigatórios."
+    const title =
+      cleanText(req.body.title, 120);
+
+    const description =
+      cleanText(
+        req.body.description,
+        500
+      );
+
+    const image =
+      cleanText(req.body.image, 500);
+
+    if (!title) {
+      return res.status(400).json({
+        error:
+          "Informe o título da notícia."
+      });
+    }
+
+    if (!description) {
+      return res.status(400).json({
+        error:
+          "Informe a descrição da notícia."
+      });
+    }
+
+    if (
+      !DATA.newsCategories.includes(
+        category
+      )
+    ) {
+      return res.status(400).json({
+        error:
+          "Categoria inválida."
+      });
+    }
+
+    if (!validUrl(image)) {
+      return res.status(400).json({
+        error:
+          "O link da imagem é inválido."
+      });
+    }
+
+    DATA.news.unshift({
+      id: generateId("news"),
+      category,
+      title,
+      description,
+      image,
+      createdAt: Date.now()
+    });
+
+    saveData(DATA);
+
+    res.json({
+      success: true,
+      news: DATA.news
     });
   }
+);
 
-  if (!DATA.newsCategories.includes(category)) {
-    return res.status(400).json({
-      error: "Categoria inválida."
+app.delete(
+  "/api/admin/news/:id",
+  adminOnly,
+  (req, res) => {
+    const id =
+      String(req.params.id);
+
+    const before =
+      DATA.news.length;
+
+    DATA.news =
+      DATA.news.filter(
+        news =>
+          String(news.id) !== id
+      );
+
+    if (
+      DATA.news.length === before
+    ) {
+      return res.status(404).json({
+        error:
+          "Notícia não encontrada."
+      });
+    }
+
+    saveData(DATA);
+
+    res.json({
+      success: true,
+      news: DATA.news
     });
   }
-
-  const news = {
-    id: makeId("news"),
-    title,
-    description,
-    image,
-    category,
-    createdAt: Date.now()
-  };
-
-  DATA.news.unshift(news);
-
-  saveData(DATA);
-
-  res.json({
-    success: true,
-    news
-  });
-});
-
-app.delete("/api/admin/news/:id", adminOnly, (req, res) => {
-  DATA.news = DATA.news.filter(
-    news => news.id !== req.params.id
-  );
-
-  saveData(DATA);
-
-  res.json({
-    success: true
-  });
-});
+);
 
 /* =========================
    PLAYERS
 ========================= */
 
-app.post("/api/admin/players", adminOnly, (req, res) => {
-  const id = clean(req.body.id);
-  const nick = clean(req.body.nick);
-  const playerClass = clean(req.body.class);
-  const role = clean(req.body.role);
-  const teamId = clean(req.body.teamId);
-  const overall = Number(req.body.overall);
+app.post(
+  "/api/admin/players",
+  adminOnly,
+  (req, res) => {
+    const id =
+      Number(req.body.id);
 
-  if (!id || !nick) {
-    return res.status(400).json({
-      error: "ID e Nick são obrigatórios."
-    });
-  }
+    const nick =
+      cleanText(req.body.nick, 40);
 
-  if (!validClass(playerClass)) {
-    return res.status(400).json({
-      error: "Classe inválida."
-    });
-  }
+    const cls =
+      String(
+        req.body.class || ""
+      ).toUpperCase();
 
-  if (!validRole(role)) {
-    return res.status(400).json({
-      error: "Cargo inválido."
-    });
-  }
+    const role =
+      String(
+        req.body.role || "PLAYER"
+      ).toUpperCase();
 
-  if (
-    !Number.isFinite(overall) ||
-    overall < 0 ||
-    overall > 100
-  ) {
-    return res.status(400).json({
-      error: "Overall deve estar entre 0 e 100."
-    });
-  }
+    const overall =
+      Number(req.body.overall);
 
-  if (
-    DATA.players.some(
-      player => String(player.id) === String(id)
-    )
-  ) {
-    return res.status(400).json({
-      error: "Já existe um jogador com esse ID."
-    });
-  }
+    const teamId =
+      req.body.teamId
+        ? String(req.body.teamId)
+        : null;
 
-  if (teamId) {
-    const team = DATA.teams.find(
-      team => team.id === teamId
-    );
-
-    if (!team) {
-      return res.status(400).json({
-        error: "Time não encontrado."
-      });
-    }
-
-    const count = DATA.players.filter(
-      player => player.teamId === teamId
-    ).length;
-
-    if (count >= 16) {
-      return res.status(400).json({
-        error: "Esse time já possui 16 jogadores."
-      });
-    }
-  }
-
-  let wage;
-
-  if (playerClass === "X") {
-    wage = Number(req.body.wage);
-
-    if (!X_WAGES.includes(wage)) {
+    if (
+      !Number.isInteger(id) ||
+      id < 1
+    ) {
       return res.status(400).json({
         error:
-          "Para a classe X, o salário deve ser 380K, 385K, 390K, 395K ou 400K."
+          "O ID precisa ser um número inteiro válido."
       });
     }
-  } else {
-    wage = WAGES[playerClass];
+
+    if (!nick) {
+      return res.status(400).json({
+        error:
+          "Informe o nick do jogador."
+      });
+    }
+
+    if (
+      !CLASS_ORDER.includes(cls)
+    ) {
+      return res.status(400).json({
+        error:
+          "Classe inválida."
+      });
+    }
+
+    if (!ROLES.includes(role)) {
+      return res.status(400).json({
+        error:
+          "Cargo inválido."
+      });
+    }
+
+    if (
+      !Number.isFinite(overall) ||
+      overall < 0 ||
+      overall > 100
+    ) {
+      return res.status(400).json({
+        error:
+          "Overall precisa estar entre 0 e 100."
+      });
+    }
+
+    if (
+      DATA.players.some(
+        player =>
+          Number(player.id) === id
+      )
+    ) {
+      return res.status(400).json({
+        error:
+          "Esse ID já está sendo usado."
+      });
+    }
+
+    if (teamId) {
+      const team =
+        getTeam(teamId);
+
+      if (!team) {
+        return res.status(400).json({
+          error:
+            "Time não encontrado."
+        });
+      }
+
+      const count =
+        DATA.players.filter(
+          player =>
+            String(player.teamId) ===
+            teamId
+        ).length;
+
+      if (count >= 16) {
+        return res.status(400).json({
+          error:
+            "Esse time já possui 16 jogadores."
+        });
+      }
+    }
+
+    let wage;
+
+    if (cls === "X") {
+      wage =
+        Number(req.body.wage);
+
+      if (
+        !X_WAGES.includes(wage)
+      ) {
+        return res.status(400).json({
+          error:
+            "Escolha um wage válido para a classe X."
+        });
+      }
+    } else {
+      wage = FIXED_WAGES[cls];
+    }
+
+    DATA.players.push({
+      id,
+      nick,
+      class: cls,
+      wage,
+      teamId,
+      role,
+      overall:
+        Math.round(overall),
+      createdAt: Date.now()
+    });
+
+    saveData(DATA);
+
+    res.json({
+      success: true,
+      players: DATA.players
+    });
   }
-
-  const player = {
-    id,
-    nick,
-    class: playerClass,
-    overall,
-    teamId,
-    role,
-    wage,
-    freeAgent: !teamId,
-    order: DATA.players.length
-  };
-
-  DATA.players.push(player);
-
-  normalizePlayers();
-  saveData(DATA);
-
-  res.json({
-    success: true,
-    player
-  });
-});
+);
 
 app.delete(
   "/api/admin/players/:id",
   adminOnly,
   (req, res) => {
-    const id = String(req.params.id);
+    const id =
+      Number(req.params.id);
 
-    DATA.players = DATA.players.filter(
-      player => String(player.id) !== id
-    );
-
-    DATA.selections.forEach(selection => {
-      selection.players = selection.players.filter(
-        playerId => String(playerId) !== id
+    const exists =
+      DATA.players.some(
+        player =>
+          Number(player.id) === id
       );
-    });
 
-    normalizePlayers();
+    if (!exists) {
+      return res.status(404).json({
+        error:
+          "Jogador não encontrado."
+      });
+    }
+
+    DATA.players =
+      DATA.players.filter(
+        player =>
+          Number(player.id) !== id
+      );
+
+    DATA.selections =
+      DATA.selections.map(
+        selection => ({
+          ...selection,
+          players:
+            selection.players.filter(
+              playerId =>
+                Number(playerId) !== id
+            )
+        })
+      );
+
     saveData(DATA);
 
     res.json({
-      success: true
+      success: true,
+      players: DATA.players,
+      selections:
+        DATA.selections
     });
   }
 );
@@ -572,68 +928,111 @@ app.delete(
    TEAMS
 ========================= */
 
-app.post("/api/admin/teams", adminOnly, (req, res) => {
-  const name = clean(req.body.name);
-  const color = clean(req.body.color) || "#b00020";
-  const logo = clean(req.body.logo);
+app.post(
+  "/api/admin/teams",
+  adminOnly,
+  (req, res) => {
+    const name =
+      cleanText(req.body.name, 60);
 
-  if (!name) {
-    return res.status(400).json({
-      error: "Informe o nome do time."
+    const color =
+      cleanText(
+        req.body.color || "#171717",
+        30
+      );
+
+    const logo =
+      cleanText(req.body.logo, 500);
+
+    if (!name) {
+      return res.status(400).json({
+        error:
+          "Informe o nome do time."
+      });
+    }
+
+    if (!validUrl(logo)) {
+      return res.status(400).json({
+        error:
+          "O link do logo é inválido."
+      });
+    }
+
+    if (
+      DATA.teams.some(
+        team =>
+          team.name.toLowerCase() ===
+          name.toLowerCase()
+      )
+    ) {
+      return res.status(400).json({
+        error:
+          "Esse time já existe."
+      });
+    }
+
+    DATA.teams.push({
+      id: generateId("team"),
+      name,
+      color,
+      logo
+    });
+
+    saveData(DATA);
+
+    res.json({
+      success: true,
+      teams: DATA.teams
     });
   }
-
-  if (
-    DATA.teams.some(
-      team =>
-        team.name.toLowerCase() === name.toLowerCase()
-    )
-  ) {
-    return res.status(400).json({
-      error: "Esse time já existe."
-    });
-  }
-
-  const team = {
-    id: makeId("team"),
-    name,
-    color,
-    logo,
-    players: []
-  };
-
-  DATA.teams.push(team);
-
-  saveData(DATA);
-
-  res.json({
-    success: true,
-    team
-  });
-});
+);
 
 app.delete(
   "/api/admin/teams/:id",
   adminOnly,
   (req, res) => {
-    const id = String(req.params.id);
+    const id =
+      String(req.params.id);
 
-    DATA.players.forEach(player => {
-      if (String(player.teamId) === id) {
-        player.teamId = "";
-        player.freeAgent = true;
-      }
-    });
+    const exists =
+      DATA.teams.some(
+        team =>
+          String(team.id) === id
+      );
 
-    DATA.teams = DATA.teams.filter(
-      team => String(team.id) !== id
-    );
+    if (!exists) {
+      return res.status(404).json({
+        error:
+          "Time não encontrado."
+      });
+    }
 
-    normalizePlayers();
+    DATA.teams =
+      DATA.teams.filter(
+        team =>
+          String(team.id) !== id
+      );
+
+    DATA.players =
+      DATA.players.map(player => {
+        if (
+          String(player.teamId) === id
+        ) {
+          return {
+            ...player,
+            teamId: null
+          };
+        }
+
+        return player;
+      });
+
     saveData(DATA);
 
     res.json({
-      success: true
+      success: true,
+      teams: DATA.teams,
+      players: DATA.players
     });
   }
 );
@@ -646,41 +1045,71 @@ app.post(
   "/api/admin/selections",
   adminOnly,
   (req, res) => {
-    const name = clean(req.body.name);
+    const name =
+      cleanText(
+        req.body.name,
+        60
+      );
+
     const color =
-      clean(req.body.color) || "#b00020";
-    const logo = clean(req.body.logo);
+      cleanText(
+        req.body.color || "#171717",
+        30
+      );
 
-    let playerIds = Array.isArray(req.body.players)
-      ? req.body.players.map(String)
-      : [];
+    const logo =
+      cleanText(
+        req.body.logo,
+        500
+      );
 
-    playerIds = [...new Set(playerIds)];
+    const players =
+      Array.isArray(req.body.players)
+        ? req.body.players
+            .map(Number)
+            .filter(Number.isInteger)
+        : [];
 
     if (!name) {
       return res.status(400).json({
-        error: "Informe o nome da seleção."
+        error:
+          "Informe o nome da seleção."
       });
     }
 
-    if (playerIds.length > 16) {
+    if (!validUrl(logo)) {
+      return res.status(400).json({
+        error:
+          "O link do logo é inválido."
+      });
+    }
+
+    if (players.length > 16) {
       return res.status(400).json({
         error:
           "Uma seleção pode ter no máximo 16 jogadores."
       });
     }
 
-    const existingPlayerIds = new Set(
-      DATA.players.map(player => String(player.id))
-    );
+    const uniquePlayers = [
+      ...new Set(players)
+    ];
 
-    const invalid = playerIds.find(
-      id => !existingPlayerIds.has(id)
-    );
+    const validPlayers =
+      uniquePlayers.filter(id =>
+        DATA.players.some(
+          player =>
+            Number(player.id) === id
+        )
+      );
 
-    if (invalid) {
+    if (
+      validPlayers.length !==
+      uniquePlayers.length
+    ) {
       return res.status(400).json({
-        error: "Um dos jogadores selecionados não existe."
+        error:
+          "Um ou mais jogadores não existem."
       });
     }
 
@@ -692,25 +1121,26 @@ app.post(
       )
     ) {
       return res.status(400).json({
-        error: "Essa seleção já existe."
+        error:
+          "Essa seleção já existe."
       });
     }
 
-    const selection = {
-      id: makeId("selection"),
+    DATA.selections.push({
+      id: generateId("selection"),
       name,
       color,
       logo,
-      players: playerIds
-    };
-
-    DATA.selections.push(selection);
+      players:
+        validPlayers.slice(0, 16)
+    });
 
     saveData(DATA);
 
     res.json({
       success: true,
-      selection
+      selections:
+        DATA.selections
     });
   }
 );
@@ -719,34 +1149,59 @@ app.delete(
   "/api/admin/selections/:id",
   adminOnly,
   (req, res) => {
-    DATA.selections = DATA.selections.filter(
-      selection =>
-        String(selection.id) !==
-        String(req.params.id)
-    );
+    const id =
+      String(req.params.id);
+
+    const exists =
+      DATA.selections.some(
+        selection =>
+          String(selection.id) === id
+      );
+
+    if (!exists) {
+      return res.status(404).json({
+        error:
+          "Seleção não encontrada."
+      });
+    }
+
+    DATA.selections =
+      DATA.selections.filter(
+        selection =>
+          String(selection.id) !== id
+      );
 
     saveData(DATA);
 
     res.json({
-      success: true
+      success: true,
+      selections:
+        DATA.selections
     });
   }
 );
 
 /* =========================
-   STATIC SITE
+   SPA FALLBACK
 ========================= */
 
-app.use(express.static(path.join(__dirname, "public")));
+app.use(
+  (req, res) => {
+    res.sendFile(
+      path.join(
+        __dirname,
+        "public",
+        "index.html"
+      )
+    );
+  }
+);
 
-app.use((req, res) => {
-  res.sendFile(
-    path.join(__dirname, "public", "index.html")
-  );
-});
-
-app.listen(PORT, () => {
-  console.log(
-    `UTL Site rodando na porta ${PORT}`
-  );
-});
+app.listen(
+  PORT,
+  () => {
+    console.log(
+      `UTL Site rodando na porta ${PORT}`
+    );
+  }
+);
