@@ -2220,3 +2220,806 @@ function renderAdmin() {
 
   `;
 }
+async function saveLinks(event) {
+
+  event.preventDefault();
+
+  const discord =
+    document
+      .getElementById("link-discord")
+      ?.value
+      .trim() || "";
+
+  const tiktok =
+    document
+      .getElementById("link-tiktok")
+      ?.value
+      .trim() || "";
+
+  const response =
+    await api(
+      "/api/admin/links",
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          discord,
+          tiktok
+        })
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao salvar os links."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function saveTable(event) {
+
+  event.preventDefault();
+
+  const tableUrl =
+    document
+      .getElementById("table-url")
+      ?.value
+      .trim() || "";
+
+  const response =
+    await api(
+      "/api/admin/table",
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          tableUrl
+        })
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao salvar a tabela."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function createCategory(event) {
+
+  event.preventDefault();
+
+  const name =
+    document
+      .getElementById("category-name")
+      ?.value
+      .trim() || "";
+
+  if (!name) return;
+
+  const response =
+    await api(
+      "/api/admin/categories",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name
+        })
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao criar categoria."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function deleteCategory(id) {
+
+  if (
+    !confirm(
+      "Excluir esta categoria?"
+    )
+  ) {
+    return;
+  }
+
+  const response =
+    await api(
+      `/api/admin/categories/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE"
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao excluir categoria."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function createNews(event) {
+
+  event.preventDefault();
+
+  const title =
+    document
+      .getElementById("news-title")
+      ?.value
+      .trim() || "";
+
+  const description =
+    document
+      .getElementById("news-description")
+      ?.value
+      .trim() || "";
+
+  const image =
+    document
+      .getElementById("news-image")
+      ?.value
+      .trim() || "";
+
+  const categoryId =
+    document
+      .getElementById("news-category")
+      ?.value || "";
+
+  if (!title || !description) {
+    return;
+  }
+
+  const response =
+    await api(
+      "/api/admin/news",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          description,
+          image,
+          categoryId
+        })
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao publicar notícia."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function deleteNews(id) {
+
+  if (
+    !confirm(
+      "Excluir esta notícia?"
+    )
+  ) {
+    return;
+  }
+
+  const response =
+    await api(
+      `/api/admin/news/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE"
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao excluir notícia."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function createPlayer(event) {
+
+  event.preventDefault();
+
+  const playerId =
+    document
+      .getElementById("player-id")
+      ?.value
+      .trim() || "";
+
+  const nick =
+    document
+      .getElementById("player-nick")
+      ?.value
+      .trim() || "";
+
+  const playerClass =
+    document
+      .getElementById("player-class")
+      ?.value || "D";
+
+  const teamId =
+    document
+      .getElementById("player-team")
+      ?.value ||
+      "FREE AGENT";
+
+  const role =
+    document
+      .getElementById("player-role")
+      ?.value ||
+      "PLAYER";
+
+  if (!playerId || !nick) {
+
+    alert(
+      "Preencha o ID e o Nick."
+    );
+
+    return;
+  }
+
+  const response =
+    await api(
+      "/api/admin/players",
+      {
+        method: "POST",
+
+        body: JSON.stringify({
+          id: playerId,
+          nick,
+          class: playerClass,
+          teamId,
+          role,
+          freeAgent:
+            teamId === "FREE AGENT"
+        })
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao adicionar jogador."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function deletePlayer(id) {
+
+  if (
+    !confirm(
+      "Excluir este jogador?"
+    )
+  ) {
+    return;
+  }
+
+  const response =
+    await api(
+      `/api/admin/players/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE"
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao excluir jogador."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function createTeam(event) {
+
+  event.preventDefault();
+
+  const name =
+    document
+      .getElementById("team-name")
+      ?.value
+      .trim() || "";
+
+  const logo =
+    document
+      .getElementById("team-logo")
+      ?.value
+      .trim() || "";
+
+  if (!name) return;
+
+  const response =
+    await api(
+      "/api/admin/teams",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          logo
+        })
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao criar time."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function deleteTeam(id) {
+
+  if (
+    !confirm(
+      "Excluir este time?"
+    )
+  ) {
+    return;
+  }
+
+  const response =
+    await api(
+      `/api/admin/teams/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE"
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao excluir time."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function createSelection(event) {
+
+  event.preventDefault();
+
+  const name =
+    document
+      .getElementById("selection-name")
+      ?.value
+      .trim() || "";
+
+  const logo =
+    document
+      .getElementById("selection-logo")
+      ?.value
+      .trim() || "";
+
+  if (!name) return;
+
+  const response =
+    await api(
+      "/api/admin/selections",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          logo
+        })
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao criar seleção."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+async function deleteSelection(id) {
+
+  if (
+    !confirm(
+      "Excluir esta seleção?"
+    )
+  ) {
+    return;
+  }
+
+  const response =
+    await api(
+      `/api/admin/selections/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE"
+      }
+    );
+
+  if (!response.ok) {
+
+    alert(
+      "Erro ao excluir seleção."
+    );
+
+    return;
+  }
+
+  await loadData();
+
+  renderAdmin();
+}
+
+
+/* =========================
+   EVENTOS
+========================= */
+
+document.addEventListener(
+  "click",
+  async event => {
+
+    const moveButton =
+      event.target.closest(
+        "[data-move-player]"
+      );
+
+    if (moveButton) {
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      await movePlayer(
+        moveButton.dataset.playerId,
+        moveButton.dataset.movePlayer
+      );
+
+      return;
+    }
+
+
+    const pageButton =
+      event.target.closest(
+        "[data-page]"
+      );
+
+    if (pageButton) {
+
+      navigate(
+        pageButton.dataset.page
+      );
+
+      return;
+    }
+
+
+    const classButton =
+      event.target.closest(
+        "[data-toggle-class]"
+      );
+
+    if (classButton) {
+
+      togglePlayerGroup(
+        classButton.dataset.toggleClass
+      );
+
+      return;
+    }
+
+
+    const categoryButton =
+      event.target.closest(
+        "[data-news-category]"
+      );
+
+    if (categoryButton) {
+
+      filterNews(
+        categoryButton.dataset.newsCategory
+      );
+
+      return;
+    }
+
+
+    const deleteNewsButton =
+      event.target.closest(
+        "[data-delete-news]"
+      );
+
+    if (deleteNewsButton) {
+
+      await deleteNews(
+        deleteNewsButton.dataset.deleteNews
+      );
+
+      return;
+    }
+
+
+    const deleteCategoryButton =
+      event.target.closest(
+        "[data-delete-category]"
+      );
+
+    if (deleteCategoryButton) {
+
+      await deleteCategory(
+        deleteCategoryButton.dataset.deleteCategory
+      );
+
+      return;
+    }
+
+
+    const deletePlayerButton =
+      event.target.closest(
+        "[data-delete-player]"
+      );
+
+    if (deletePlayerButton) {
+
+      await deletePlayer(
+        deletePlayerButton.dataset.deletePlayer
+      );
+
+      return;
+    }
+
+
+    const deleteTeamButton =
+      event.target.closest(
+        "[data-delete-team]"
+      );
+
+    if (deleteTeamButton) {
+
+      await deleteTeam(
+        deleteTeamButton.dataset.deleteTeam
+      );
+
+      return;
+    }
+
+
+    const deleteSelectionButton =
+      event.target.closest(
+        "[data-delete-selection]"
+      );
+
+    if (deleteSelectionButton) {
+
+      await deleteSelection(
+        deleteSelectionButton.dataset.deleteSelection
+      );
+
+      return;
+    }
+
+
+    const logoutButton =
+      event.target.closest(
+        "[data-logout]"
+      );
+
+    if (logoutButton) {
+
+      await logout();
+
+      return;
+    }
+  }
+);
+
+
+/* =========================
+   FORMULÁRIOS
+========================= */
+
+document.addEventListener(
+  "submit",
+  async event => {
+
+    if (
+      event.target.id ===
+      "links-form"
+    ) {
+
+      await saveLinks(event);
+
+      return;
+    }
+
+
+    if (
+      event.target.id ===
+      "table-form"
+    ) {
+
+      await saveTable(event);
+
+      return;
+    }
+
+
+    if (
+      event.target.id ===
+      "category-form"
+    ) {
+
+      await createCategory(event);
+
+      return;
+    }
+
+
+    if (
+      event.target.id ===
+      "news-form"
+    ) {
+
+      await createNews(event);
+
+      return;
+    }
+
+
+    if (
+      event.target.id ===
+      "player-form"
+    ) {
+
+      await createPlayer(event);
+
+      return;
+    }
+
+
+    if (
+      event.target.id ===
+      "team-form"
+    ) {
+
+      await createTeam(event);
+
+      return;
+    }
+
+
+    if (
+      event.target.id ===
+      "selection-form"
+    ) {
+
+      await createSelection(event);
+
+      return;
+    }
+  }
+);
+
+
+/* =========================
+   LOGIN
+========================= */
+
+document.addEventListener(
+  "click",
+  event => {
+
+    const loginButton =
+      event.target.closest(
+        "#login-button"
+      );
+
+    if (loginButton) {
+
+      login();
+
+      return;
+    }
+
+
+    const closeButton =
+      event.target.closest(
+        "#close-login"
+      );
+
+    if (closeButton) {
+
+      hideLogin();
+
+      return;
+    }
+  }
+);
+
+
+/* =========================
+   INICIALIZAÇÃO
+========================= */
+
+(async function init() {
+
+  await checkAdmin();
+
+  await loadData();
+
+})();
