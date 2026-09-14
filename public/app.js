@@ -1,5 +1,8 @@
 let data = {
-  links: {},
+  links: {
+    discord: "",
+    tiktok: ""
+  },
   tableUrl: "",
   categories: [],
   news: [],
@@ -46,15 +49,11 @@ const wages = {
   "D": "75K"
 };
 
-
-/* =========================
-   ELEMENTOS
-========================= */
-
 const content = document.getElementById("page-content");
 const pageTitle = document.getElementById("page-title");
 const sidebar = document.querySelector(".sidebar");
 
+let currentPage = "home";
 
 /* =========================
    UTILIDADES
@@ -94,13 +93,79 @@ function getTeam(player) {
 }
 
 function getPlayerWage(player) {
-  if (wages[player.class]) {
-    return wages[player.class];
-  }
-
-  return "—";
+  return wages[player.class] || "—";
 }
 
+function classBadge(playerClass) {
+  const cls = getBaseClass(playerClass);
+
+  return `
+    <span class="class-badge class-${cls.toLowerCase()}">
+      ${escapeHTML(playerClass)}
+    </span>
+  `;
+}
+
+function teamHTML(player) {
+  if (
+    player.freeAgent === true ||
+    player.teamId === "" ||
+    !player.teamId
+  ) {
+    return `
+      <span class="free-agent">
+        🏷️ FREE AGENT
+      </span>
+    `;
+  }
+
+  const team = getTeam(player);
+
+  if (!team) {
+    return `
+      <span class="free-agent">
+        🏷️ FREE AGENT
+      </span>
+    `;
+  }
+
+  return `
+    <span class="player-team">
+      ${
+        team.logo
+          ? `<img src="${escapeHTML(team.logo)}" alt="">`
+          : ""
+      }
+      <span>${escapeHTML(team.name)}</span>
+    </span>
+  `;
+}
+
+async function api(url, options = {}) {
+  const response = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    },
+    ...options
+  });
+
+  let result = {};
+
+  try {
+    result = await response.json();
+  } catch {
+    result = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      result.error || "Ocorreu um erro."
+    );
+  }
+
+  return result;
+}
 
 /* =========================
    CARREGAR DADOS
@@ -108,30 +173,37 @@ function getPlayerWage(player) {
 
 async function loadData() {
   try {
-    const response = await fetch("/api/data");
+    const result = await api("/api/data");
 
-    if (!response.ok) {
-      throw new Error("Erro ao carregar dados");
-    }
-
-    data = await response.json();
+    data = {
+      links: {
+        discord: "",
+        tiktok: "",
+        ...(result.links || {})
+      },
+      tableUrl: result.tableUrl || "",
+      categories: result.categories || [],
+      news: result.news || [],
+      players: result.players || [],
+      selections: result.selections || [],
+      teams: result.teams || []
+    };
 
     await checkAdmin();
 
-    showPage("home");
-
+    renderPage(currentPage);
   } catch (error) {
     console.error(error);
 
     content.innerHTML = `
-      <div class="card">
-        <h2>Erro</h2>
-        <p>Não foi possível carregar o site.</p>
+      <div class="empty-state">
+        <h2>Erro ao carregar o site</h2>
+        <p>${escapeHTML(error.message)}</p>
+        <button onclick="loadData()">Tentar novamente</button>
       </div>
     `;
   }
 }
-
 
 /* =========================
    ADMIN
@@ -139,141 +211,189 @@ async function loadData() {
 
 async function checkAdmin() {
   try {
-    const response = await fetch("/api/admin/status");
-
-    const result = await response.json();
+    const result = await api("/api/admin/status");
 
     isAdmin = result.isAdmin === true;
 
+    updateAdminButton();
   } catch {
     isAdmin = false;
   }
 }
 
+function updateAdminButton() {
+  const button = document.querySelector(
+    '[data-page="admin"]'
+  );
+
+  if (!button) return;
+
+  button.innerHTML = isAdmin
+    ? "⚙️ Painel Admin"
+    : "🔐 Admin";
+}
+
+function openLogin() {
+  const modal = document.getElementById("login-modal");
+
+  if (!modal) return;
+
+  modal.classList.add("show");
+
+  const input = document.getElementById("admin-password");
+
+  if (input) {
+    input.value = "";
+    setTimeout(() => input.focus(), 100);
+  }
+}
+
+function closeLogin() {
+  const modal = document.getElementById("login-modal");
+
+  if (modal) {
+    modal.classList.remove("show");
+  }
+
+  const error = document.getElementById("login-error");
+
+  if (error) {
+    error.textContent = "";
+  }
+}
+
 async function loginAdmin() {
-  const password =
-    document.getElementById("admin-password").value;
+  const input = document.getElementById("admin-password");
+  const error = document.getElementById("login-error");
 
-  const error =
-    document.getElementById("login-error");
+  if (!input) return;
 
-  error.textContent = "";
+  const password = input.value;
+
+  if (!password) {
+    if (error) {
+      error.textContent = "Digite a senha.";
+    }
+
+    return;
+  }
 
   try {
-    const response = await fetch("/api/admin/login", {
+    await api("/api/admin/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({
         password
       })
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      error.textContent =
-        result.error || "Senha incorreta.";
-
-      return;
-    }
-
     isAdmin = true;
 
-    document
-      .getElementById("login-modal")
-      .classList.add("hidden");
+    closeLogin();
+    updateAdminButton();
 
-    document.getElementById("admin-password").value = "";
+    currentPage = "admin";
+    renderPage("admin");
 
-    showPage("admin");
-
-  } catch {
-    error.textContent =
-      "Erro ao tentar entrar.";
+  } catch (err) {
+    if (error) {
+      error.textContent = err.message;
+    }
   }
 }
 
 async function logoutAdmin() {
-  await fetch("/api/admin/logout", {
-    method: "POST"
-  });
+  try {
+    await api("/api/admin/logout", {
+      method: "POST"
+    });
 
-  isAdmin = false;
+    isAdmin = false;
 
-  showPage("home");
+    updateAdminButton();
+
+    currentPage = "home";
+    renderPage("home");
+
+  } catch (error) {
+    alert(error.message);
+  }
 }
-
 
 /* =========================
    NAVEGAÇÃO
 ========================= */
 
-function showPage(page) {
+function navigate(page) {
+  currentPage = page;
 
   document
-    .querySelectorAll(".sidebar nav button")
+    .querySelectorAll("[data-page]")
     .forEach(button => {
-      button.classList.remove("active");
-
-      if (button.dataset.page === page) {
-        button.classList.add("active");
-      }
+      button.classList.toggle(
+        "active",
+        button.dataset.page === page
+      );
     });
 
-  const titles = {
-    home: "ULTIMATE TCS LEAGUE",
-    others: "Others",
-    news: "News",
-    table: "Tabela",
-    players: "Jogadores",
-    selections: "Seleções",
-    teams: "Times",
-    admin: "Admin Area"
-  };
+  renderPage(page);
 
-  pageTitle.textContent =
-    titles[page] || "ULTIMATE TCS LEAGUE";
+  if (window.innerWidth <= 900) {
+    sidebar?.classList.remove("open");
+  }
 
-  sidebar.classList.remove("open");
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
 
+function renderPage(page) {
   switch (page) {
-
     case "home":
+      pageTitle.textContent = "Início";
       renderHome();
       break;
 
     case "others":
+      pageTitle.textContent = "Outros";
       renderOthers();
       break;
 
     case "news":
+      pageTitle.textContent = "Notícias";
       renderNews();
       break;
 
     case "table":
+      pageTitle.textContent = "Tabela";
       renderTable();
       break;
 
     case "players":
+      pageTitle.textContent = "Jogadores";
       renderPlayers();
       break;
 
     case "selections":
+      pageTitle.textContent = "Seleções";
       renderSelections();
       break;
 
     case "teams":
+      pageTitle.textContent = "Times";
       renderTeams();
       break;
 
     case "admin":
-      if (isAdmin) {
-        renderAdmin();
-      } else {
+      pageTitle.textContent = "Administração";
+
+      if (!isAdmin) {
         openLogin();
+        navigate("home");
+        return;
       }
+
+      renderAdmin();
       break;
 
     default:
@@ -281,22 +401,33 @@ function showPage(page) {
   }
 }
 
-
 /* =========================
    HOME
 ========================= */
 
 function renderHome() {
-
   content.innerHTML = `
-    <div class="home-page">
+    <section class="hero">
 
-      <div class="hero">
+      <img
+        src="/images/banner.png"
+        class="hero-banner"
+        alt="ULTIMATE TCS LEAGUE"
+        onerror="this.style.display='none'"
+      >
 
-        <div class="hero-content">
+      <div class="hero-content">
 
-          <span class="hero-tag">
-            UTL
+        <img
+          src="/images/logo.png"
+          class="hero-logo"
+          alt="UTL"
+          onerror="this.style.display='none'"
+        >
+
+        <div>
+          <span class="hero-kicker">
+            EST. 2026
           </span>
 
           <h1>
@@ -304,125 +435,156 @@ function renderHome() {
           </h1>
 
           <p>
-            Bem-vindo ao site oficial da UTL.
+            A casa oficial da UTL.
+            Notícias, jogadores, times,
+            seleções e muito mais.
           </p>
-
         </div>
 
+      </div>
+
+    </section>
+
+    <section class="stats-grid">
+
+      <div class="stat-card">
+        <strong>${data.players.length}</strong>
+        <span>Jogadores</span>
+      </div>
+
+      <div class="stat-card">
+        <strong>${data.teams.length}</strong>
+        <span>Times</span>
+      </div>
+
+      <div class="stat-card">
+        <strong>${data.selections.length}</strong>
+        <span>Seleções</span>
+      </div>
+
+      <div class="stat-card">
+        <strong>${data.news.length}</strong>
+        <span>Notícias</span>
+      </div>
+
+    </section>
+
+    <section class="section-card">
+
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">UTL</span>
+          <h2>Últimas notícias</h2>
+        </div>
+
+        <button onclick="navigate('news')">
+          Ver todas
+        </button>
       </div>
 
       ${
         data.news.length
           ? `
-            <div style="margin-top:25px">
+            <div class="news-grid">
+              ${data.news
+                .slice(0, 3)
+                .map(newsCard)
+                .join("")}
+            </div>
+          `
+          : `
+            <div class="empty-state">
+              <h3>Nenhuma notícia ainda</h3>
+              <p>As notícias da UTL aparecerão aqui.</p>
+            </div>
+          `
+      }
 
-              <h2 style="margin-bottom:15px">
-                Últimas notícias
-              </h2>
+    </section>
+  `;
+}
 
-              <div class="news-grid">
-                ${data.news
-                  .slice(0, 3)
-                  .map(newsCard)
-                  .join("")}
-              </div>
+/* =========================
+   OUTROS
+========================= */
 
+function renderOthers() {
+  content.innerHTML = `
+    <section class="section-card">
+
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">LINKS</span>
+          <h2>Outros</h2>
+        </div>
+      </div>
+
+      <div class="link-grid">
+
+        ${
+          data.links.discord
+            ? `
+              <a
+                class="big-link"
+                href="${escapeHTML(data.links.discord)}"
+                target="_blank"
+                rel="noopener"
+              >
+                <span>💬</span>
+                <div>
+                  <strong>Discord</strong>
+                  <small>Entre no servidor oficial</small>
+                </div>
+              </a>
+            `
+            : ""
+        }
+
+        ${
+          data.links.tiktok
+            ? `
+              <a
+                class="big-link"
+                href="${escapeHTML(data.links.tiktok)}"
+                target="_blank"
+                rel="noopener"
+              >
+                <span>🎵</span>
+                <div>
+                  <strong>TikTok</strong>
+                  <small>Siga a UTL</small>
+                </div>
+              </a>
+            `
+            : ""
+        }
+
+      </div>
+
+      ${
+        !data.links.discord && !data.links.tiktok
+          ? `
+            <div class="empty-state">
+              <h3>Nenhum link configurado</h3>
+              <p>O administrador ainda não adicionou os links.</p>
             </div>
           `
           : ""
       }
 
-    </div>
+    </section>
   `;
 }
 
-
 /* =========================
-   OTHERS
-========================= */
-
-function renderOthers() {
-
-  const discord =
-    data.links?.discord || "";
-
-  const tiktok =
-    data.links?.tiktok || "";
-
-  content.innerHTML = `
-
-    <div class="card">
-
-      <h2>Others</h2>
-
-      <p>
-        Links oficiais da ULTIMATE TCS LEAGUE.
-      </p>
-
-    </div>
-
-    <div class="admin-grid">
-
-      <div class="card">
-
-        <h3>Discord</h3>
-
-        <p style="margin-bottom:15px">
-          Entre no servidor oficial.
-        </p>
-
-        ${
-          discord
-            ? `
-              <a
-                href="${escapeHTML(discord)}"
-                target="_blank"
-                class="primary-button"
-                style="display:inline-block;text-decoration:none"
-              >
-                Entrar no Discord
-              </a>
-            `
-            : "<p>Link não configurado.</p>"
-        }
-
-      </div>
-
-      <div class="card">
-
-        <h3>TikTok</h3>
-
-        <p style="margin-bottom:15px">
-          Acompanhe a UTL.
-        </p>
-
-        ${
-          tiktok
-            ? `
-              <a
-                href="${escapeHTML(tiktok)}"
-                target="_blank"
-                class="primary-button"
-                style="display:inline-block;text-decoration:none"
-              >
-                Abrir TikTok
-              </a>
-            `
-            : "<p>Link não configurado.</p>"
-        }
-
-      </div>
-
-    </div>
-  `;
-}
-
-
-/* =========================
-   NEWS
+   NOTÍCIAS
 ========================= */
 
 function newsCard(news) {
+  const category = data.categories.find(
+    category =>
+      String(category.id) === String(news.categoryId)
+  );
 
   return `
     <article class="news-card">
@@ -432,17 +594,28 @@ function newsCard(news) {
           ? `
             <img
               src="${escapeHTML(news.image)}"
-              alt="${escapeHTML(news.title)}"
+              alt=""
+              loading="lazy"
             >
           `
-          : ""
+          : `
+            <div class="news-placeholder">
+              UTL
+            </div>
+          `
       }
 
       <div class="news-body">
 
-        <span class="news-category">
-          ${escapeHTML(news.category || "Geral")}
-        </span>
+        ${
+          category
+            ? `
+              <span class="news-category">
+                ${escapeHTML(category.name)}
+              </span>
+            `
+            : ""
+        }
 
         <h3>
           ${escapeHTML(news.title)}
@@ -452,20 +625,6 @@ function newsCard(news) {
           ${escapeHTML(news.description)}
         </p>
 
-        ${
-          isAdmin
-            ? `
-              <button
-                class="danger-button"
-                style="margin-top:15px"
-                onclick="deleteNews('${escapeHTML(news.id)}')"
-              >
-                Excluir
-              </button>
-            `
-            : ""
-        }
-
       </div>
 
     </article>
@@ -473,712 +632,438 @@ function newsCard(news) {
 }
 
 function renderNews() {
+  const categories = data.categories || [];
 
   content.innerHTML = `
+    <section class="section-card">
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-
-      <div>
-        <h1>News</h1>
-        <p style="color:#777;margin-top:5px">
-          Notícias da ULTIMATE TCS LEAGUE
-        </p>
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">UTL NEWS</span>
+          <h2>Notícias</h2>
+        </div>
       </div>
 
       ${
-        isAdmin
+        categories.length
           ? `
-            <button
-              class="primary-button"
-              onclick="renderAdmin()"
-            >
-              + Nova notícia
-            </button>
+            <div class="category-filter">
+              <button
+                class="category-button active"
+                onclick="filterNews('all', this)"
+              >
+                Todas
+              </button>
+
+              ${categories
+                .map(category => `
+                  <button
+                    class="category-button"
+                    onclick="filterNews('${escapeHTML(category.id)}', this)"
+                  >
+                    ${escapeHTML(category.name)}
+                  </button>
+                `)
+                .join("")}
+            </div>
           `
           : ""
       }
 
-    </div>
+      <div
+        class="news-grid"
+        id="news-grid"
+      >
+        ${
+          data.news.length
+            ? data.news.map(newsCard).join("")
+            : `
+              <div class="empty-state">
+                <h3>Nenhuma notícia publicada</h3>
+                <p>Volte mais tarde.</p>
+              </div>
+            `
+        }
+      </div>
 
-    ${
-      data.news.length
-        ? `
-          <div class="news-grid">
-            ${data.news.map(newsCard).join("")}
-          </div>
-        `
-        : `
-          <div class="empty">
-            Nenhuma notícia publicada.
-          </div>
-        `
-    }
-
+    </section>
   `;
 }
 
-async function deleteNews(id) {
+function filterNews(categoryId, button) {
+  document
+    .querySelectorAll(".category-button")
+    .forEach(btn =>
+      btn.classList.remove("active")
+    );
 
-  if (!confirm("Excluir esta notícia?")) {
-    return;
-  }
+  button.classList.add("active");
 
-  await fetch(`/api/admin/news/${id}`, {
-    method: "DELETE"
-  });
+  const grid = document.getElementById("news-grid");
 
-  await refreshData();
+  if (!grid) return;
 
-  renderNews();
+  const filtered =
+    categoryId === "all"
+      ? data.news
+      : data.news.filter(
+          news =>
+            String(news.categoryId) ===
+            String(categoryId)
+        );
+
+  grid.innerHTML = filtered.length
+    ? filtered.map(newsCard).join("")
+    : `
+      <div class="empty-state">
+        <h3>Nenhuma notícia nesta categoria</h3>
+      </div>
+    `;
 }
-
 
 /* =========================
    TABELA
 ========================= */
 
 function renderTable() {
-
   content.innerHTML = `
+    <section class="section-card table-section">
 
-    <div class="card">
-
-      <h1>Tabela</h1>
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">COMPETIÇÃO</span>
+          <h2>Tabela</h2>
+        </div>
+      </div>
 
       ${
         data.tableUrl
           ? `
-            <p style="margin:15px 0">
-              Acesse a tabela da UTL pelo botão abaixo.
-            </p>
+            <div class="table-actions">
+              <a
+                href="${escapeHTML(data.tableUrl)}"
+                target="_blank"
+                rel="noopener"
+                class="primary-button"
+              >
+                📊 Abrir tabela
+              </a>
+            </div>
 
-            <a
-              href="${escapeHTML(data.tableUrl)}"
-              target="_blank"
-              class="primary-button"
-              style="display:inline-block;text-decoration:none"
-            >
-              Abrir Tabela
-            </a>
+            <iframe
+              class="table-frame"
+              src="${escapeHTML(data.tableUrl)}"
+              loading="lazy"
+            ></iframe>
           `
           : `
-            <div class="empty">
-              A tabela ainda não foi configurada.
+            <div class="empty-state">
+              <h3>Tabela ainda não configurada</h3>
+              <p>O administrador ainda não adicionou o link.</p>
             </div>
           `
       }
 
-    </div>
+    </section>
   `;
 }
-
 
 /* =========================
    JOGADORES
 ========================= */
 
 function renderPlayers() {
-
-  const groups = {
-    X: [],
-    S: [],
-    A: [],
-    B: [],
-    C: [],
-    D: []
-  };
-
-  data.players.forEach(player => {
-
-    const group =
-      getBaseClass(player.class);
-
-    if (groups[group]) {
-      groups[group].push(player);
-    }
-
-  });
-
-  classOrder.forEach(() => {});
-
-  Object.keys(groups).forEach(group => {
-
-    groups[group].sort((a, b) => {
-
-      const aIndex =
-        classOrder.indexOf(
-          String(a.class).toUpperCase()
-        );
-
-      const bIndex =
-        classOrder.indexOf(
-          String(b.class).toUpperCase()
-        );
-
-      return aIndex - bIndex;
-
-    });
-
-  });
-
   content.innerHTML = `
+    <section class="section-card">
 
-    <div class="players-page">
-
-      <div class="players-title">
-
+      <div class="section-heading">
         <div>
-          <h1>Jogadores</h1>
-
-          ${
-            isAdmin
-              ? `
-                <span class="admin-hint">
-                  Arraste os jogadores para reorganizar
-                </span>
-              `
-              : ""
-          }
-
+          <span class="section-kicker">ELENCO</span>
+          <h2>Jogadores</h2>
         </div>
-
       </div>
 
-      <div class="players-table-head">
-
-        <span>CLASS</span>
-        <span>NICK</span>
-        <span>TIME</span>
-        <span>WAGE</span>
-
-      </div>
-
-      <div class="player-class-list">
+      <div class="players-container">
 
         ${classGroups
-          .map(group => {
-
-            const id =
-              `players-${group}`;
-
-            return `
-
-              <section class="player-class">
-
-                <button
-                  class="player-class-toggle"
-                  type="button"
-                  data-target="${id}"
-                  aria-expanded="false"
-                >
-
-                  <span>
-                    CLASS ${group}
-                  </span>
-
-                  <span class="class-arrow">
-                    ⌃
-                  </span>
-
-                </button>
-
-                <div
-                  class="player-class-content"
-                  id="${id}"
-                  hidden
-                >
-
-                  ${groups[group]
-                    .map(player =>
-                      playerRow(player)
-                    )
-                    .join("")}
-
-                  ${
-                    groups[group].length === 0
-                      ? `
-                        <div class="empty">
-                          Nenhum jogador nesta classe.
-                        </div>
-                      `
-                      : ""
-                  }
-
-                </div>
-
-              </section>
-
-            `;
-
-          })
+          .map(group => renderPlayerGroup(group))
           .join("")}
 
       </div>
 
-    </div>
+    </section>
   `;
-
-  setupClassButtons();
-
-  if (isAdmin) {
-    setupDragAndDrop();
-  }
 }
 
+function renderPlayerGroup(group) {
+  const players = data.players.filter(
+    player =>
+      getBaseClass(player.class) === group
+  );
 
-/* =========================
-   LINHA DO JOGADOR
-========================= */
+  const rows = players
+    .map(player => `
+      <div
+        class="player-row"
+        draggable="${isAdmin}"
+        data-player-id="${escapeHTML(player.id)}"
+      >
 
-function playerRow(player) {
+        <div class="player-class">
+          ${classBadge(player.class)}
+        </div>
 
-  const playerClass =
-    String(player.class || "D").toUpperCase();
+        <div class="player-nick">
+          ${escapeHTML(player.nick)}
+        </div>
 
-  const base =
-    getBaseClass(playerClass);
+        <div class="player-team-cell">
+          ${teamHTML(player)}
+        </div>
 
-  const team =
-    getTeam(player);
+        <div class="player-wage">
+          ${escapeHTML(getPlayerWage(player))}
+        </div>
 
-  let teamHTML = "";
-
-  if (!team) {
-
-    teamHTML = `
-      <span>
-        🏷️ FREE AGENT
-      </span>
-    `;
-
-  } else {
-
-    teamHTML = `
-
-      ${
-        team.logo
-          ? `
-            <img
-              src="${escapeHTML(team.logo)}"
-              alt=""
-            >
-          `
-          : ""
-      }
-
-      <span>
-        ${escapeHTML(team.name)}
-      </span>
-
-    `;
-
-  }
+      </div>
+    `)
+    .join("");
 
   return `
+    <div class="player-class-group">
 
-    <div
-      class="player-row"
-      draggable="${isAdmin}"
-      data-player-id="${escapeHTML(player.id)}"
-    >
-
-      <span
-        class="class-badge class-${base.toLowerCase()}"
+      <button
+        class="class-group-header"
+        onclick="togglePlayerGroup('${group}')"
       >
-        ${escapeHTML(playerClass)}
-      </span>
 
-      <span class="player-nick">
-        ${escapeHTML(
-          player.nick ||
-          player.name ||
-          "Sem nome"
-        )}
-      </span>
+        <span>
+          CLASS ${group}
+        </span>
 
-      <span class="player-team">
-        ${teamHTML}
-      </span>
+        <span
+          class="class-arrow"
+          id="arrow-${group}"
+        >
+          ^
+        </span>
 
-      <span class="player-wage">
-        ${escapeHTML(
-          player.wage ||
-          getPlayerWage(player)
-        )}
-      </span>
+      </button>
+
+      <div
+        class="players-group-content"
+        id="group-${group}"
+        style="display:none"
+      >
+
+        <div class="players-table-head">
+          <span>CLASS</span>
+          <span>NICK</span>
+          <span>TIME</span>
+          <span>WAGE</span>
+        </div>
+
+        <div
+          class="players-list"
+          data-group="${group}"
+        >
+          ${
+            rows ||
+            `
+              <div class="empty-player">
+                Nenhum jogador nesta classe.
+              </div>
+            `
+          }
+        </div>
+
+      </div>
 
     </div>
-
   `;
 }
 
+function togglePlayerGroup(group) {
+  const element = document.getElementById(
+    `group-${group}`
+  );
 
-/* =========================
-   ABRIR / FECHAR CLASSE
-========================= */
+  const arrow = document.getElementById(
+    `arrow-${group}`
+  );
 
-function setupClassButtons() {
+  if (!element) return;
 
-  document
-    .querySelectorAll(".player-class-toggle")
-    .forEach(button => {
+  const isClosed =
+    element.style.display === "none";
 
-      button.addEventListener("click", () => {
+  element.style.display =
+    isClosed ? "block" : "none";
 
-        const target =
-          document.getElementById(
-            button.dataset.target
-          );
-
-        const isOpen =
-          !target.hidden;
-
-        target.hidden = isOpen;
-
-        button.setAttribute(
-          "aria-expanded",
-          String(!isOpen)
-        );
-
-        button
-          .querySelector(".class-arrow")
-          .textContent =
-            isOpen ? "⌃" : "⌄";
-
-      });
-
-    });
-
+  if (arrow) {
+    arrow.textContent =
+      isClosed ? "v" : "^";
+  }
 }
 
-
 /* =========================
-   DRAG AND DROP
+   DRAG & DROP
 ========================= */
+
+let draggedPlayerId = null;
 
 function setupDragAndDrop() {
+  if (!isAdmin) return;
 
   document
-    .querySelectorAll(".player-class-content")
-    .forEach(zone => {
+    .querySelectorAll(".player-row[draggable='true']")
+    .forEach(row => {
 
-      let dragged = null;
+      row.addEventListener(
+        "dragstart",
+        event => {
+          draggedPlayerId =
+            row.dataset.playerId;
 
-      zone
-        .querySelectorAll(".player-row")
-        .forEach(row => {
+          row.classList.add("dragging");
 
-          row.addEventListener(
-            "dragstart",
-            () => {
+          event.dataTransfer.effectAllowed =
+            "move";
 
-              dragged = row;
-
-              row.classList.add(
-                "dragging"
-              );
-
-            }
+          event.dataTransfer.setData(
+            "text/plain",
+            draggedPlayerId
           );
-
-          row.addEventListener(
-            "dragend",
-            async () => {
-
-              row.classList.remove(
-                "dragging"
-              );
-
-              await savePlayerOrder();
-
-            }
-          );
-
-          row.addEventListener(
-            "dragover",
-            event => {
-
-              event.preventDefault();
-
-              if (
-                !dragged ||
-                dragged === row
-              ) {
-                return;
-              }
-
-              const rect =
-                row.getBoundingClientRect();
-
-              const before =
-                event.clientY <
-                rect.top +
-                rect.height / 2;
-
-              if (before) {
-
-                zone.insertBefore(
-                  dragged,
-                  row
-                );
-
-              } else {
-
-                zone.insertBefore(
-                  dragged,
-                  row.nextSibling
-                );
-
-              }
-
-            }
-          );
-
-        });
-
-    });
-
-}
-
-
-/* =========================
-   SALVAR ORDEM
-========================= */
-
-async function savePlayerOrder() {
-
-  const rows =
-    document.querySelectorAll(
-      ".player-class-content .player-row"
-    );
-
-  const order =
-    Array.from(rows)
-      .map(row =>
-        row.dataset.playerId
+        }
       );
 
-  try {
+      row.addEventListener(
+        "dragend",
+        () => {
+          row.classList.remove("dragging");
+          draggedPlayerId = null;
+        }
+      );
 
-    await fetch(
+      row.addEventListener(
+        "dragover",
+        event => {
+          event.preventDefault();
+
+          row.classList.add("drag-over");
+        }
+      );
+
+      row.addEventListener(
+        "dragleave",
+        () => {
+          row.classList.remove("drag-over");
+        }
+      );
+
+      row.addEventListener(
+        "drop",
+        async event => {
+          event.preventDefault();
+
+          row.classList.remove("drag-over");
+
+          const targetId =
+            row.dataset.playerId;
+
+          if (
+            !draggedPlayerId ||
+            draggedPlayerId === targetId
+          ) {
+            return;
+          }
+
+          reorderPlayers(
+            draggedPlayerId,
+            targetId
+          );
+        }
+      );
+    });
+}
+
+async function reorderPlayers(
+  draggedId,
+  targetId
+) {
+  const draggedIndex =
+    data.players.findIndex(
+      player =>
+        String(player.id) ===
+        String(draggedId)
+    );
+
+  const targetIndex =
+    data.players.findIndex(
+      player =>
+        String(player.id) ===
+        String(targetId)
+    );
+
+  if (
+    draggedIndex === -1 ||
+    targetIndex === -1
+  ) {
+    return;
+  }
+
+  const draggedPlayer =
+    data.players.splice(
+      draggedIndex,
+      1
+    )[0];
+
+  data.players.splice(
+    targetIndex,
+    0,
+    draggedPlayer
+  );
+
+  try {
+    await api(
       "/api/admin/players/reorder",
       {
         method: "PUT",
-
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
-
         body: JSON.stringify({
-          order
+          orderedIds:
+            data.players.map(
+              player => player.id
+            )
         })
       }
     );
 
-    await refreshData();
+    renderPlayers();
+    setupDragAndDrop();
 
   } catch (error) {
+    alert(error.message);
 
-    console.error(
-      "Erro ao salvar ordem:",
-      error
-    );
-
+    await loadData();
   }
-
 }
-
 
 /* =========================
    SELEÇÕES
 ========================= */
 
 function renderSelections() {
-
   content.innerHTML = `
+    <section class="section-card">
 
-    <div style="margin-bottom:20px">
-
-      <h1>Seleções</h1>
-
-      <p style="color:#777;margin-top:5px">
-        Seleções cadastradas na UTL.
-      </p>
-
-    </div>
-
-    ${
-      data.selections.length
-        ? `
-          <div class="selection-grid">
-
-            ${data.selections
-              .map(selection => `
-
-                <div class="selection-card">
-
-                  ${
-                    selection.logo
-                      ? `
-                        <img
-                          src="${escapeHTML(selection.logo)}"
-                          alt=""
-                        >
-                      `
-                      : ""
-                  }
-
-                  <h3>
-                    ${escapeHTML(
-                      selection.name
-                    )}
-                  </h3>
-
-                  <p>
-                    ${
-                      Array.isArray(
-                        selection.players
-                      )
-                        ? selection.players.length
-                        : 0
-                    }
-                    jogadores
-                  </p>
-
-                </div>
-
-              `)
-              .join("")}
-
-          </div>
-        `
-        : `
-          <div class="empty">
-            Nenhuma seleção cadastrada.
-          </div>
-        `
-    }
-
-  `;
-}
-
-
-/* =========================
-   TIMES
-========================= */
-
-function renderTeams() {
-
-  content.innerHTML = `
-
-    <div style="margin-bottom:20px">
-
-      <h1>Times</h1>
-
-      <p style="color:#777;margin-top:5px">
-        Times cadastrados na UTL.
-      </p>
-
-    </div>
-
-    ${
-      data.teams.length
-        ? `
-          <div class="team-grid">
-
-            ${data.teams
-              .map(team => `
-
-                <div class="team-card">
-
-                  ${
-                    team.logo
-                      ? `
-                        <img
-                          src="${escapeHTML(team.logo)}"
-                          alt=""
-                        >
-                      `
-                      : ""
-                  }
-
-                  <h3>
-                    ${escapeHTML(
-                      team.name
-                    )}
-                  </h3>
-
-                  <p>
-                    ${
-                      Array.isArray(team.players)
-                        ? team.players.length
-                        : 0
-                    }
-                    jogadores
-                  </p>
-
-                </div>
-
-              `)
-              .join("")}
-
-          </div>
-        `
-        : `
-          <div class="empty">
-            Nenhum time cadastrado.
-          </div>
-        `
-    }
-
-  `;
-}
-
-
-/* =========================
-   ADMIN
-========================= */
-
-function renderAdmin() {
-
-  if (!isAdmin) {
-    openLogin();
-    return;
-  }
-
-  content.innerHTML = `
-
-    <div
-      style="
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        margin-bottom:20px;
-      "
-    >
-
-      <div>
-
-        <h1>Admin Area</h1>
-
-        <p style="color:#777;margin-top:5px">
-          Gerencie o conteúdo da UTL.
-        </p>
-
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">INTERNACIONAL</span>
+          <h2>Seleções</h2>
+        </div>
       </div>
 
-      <button
-        class="danger-button"
-        onclick="logoutAdmin()"
-      >
-        Sair
-      </button>
-
-    </div>
-
-
-    <div class="admin-grid">
-
-
-    
+      ${
+        data.selections.length
+          ? `
+            <div class="t
