@@ -68,7 +68,7 @@ function escapeHTML(value) {
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#039;"
-  }[char]);
+  }[char]));
 }
 
 function getBaseClass(playerClass) {
