@@ -687,3 +687,527 @@ function renderTable() {
     }
   `;
 }
+/* =========================
+   PLAYERS
+========================= */
+
+function renderPlayers() {
+  content.innerHTML = `
+    <div class="page-header">
+      <h2>Jogadores</h2>
+      <p>Confira os jogadores separados por classe.</p>
+    </div>
+
+    <div class="players-container">
+      ${classGroups.map(renderPlayerGroup).join("")}
+    </div>
+  `;
+
+  setupDragAndDrop();
+}
+
+function renderPlayerGroup(group) {
+  const players = data.players
+    .filter(player => getBaseClass(player.class) === group)
+    .sort((a, b) => {
+      const ai = classOrder.indexOf(a.class);
+      const bi = classOrder.indexOf(b.class);
+
+      if (ai !== bi) return ai - bi;
+
+      return Number(a.order || 0) - Number(b.order || 0);
+    });
+
+  return `
+    <section
+      class="player-class-section"
+      data-class-group="${group}"
+    >
+
+      <button
+        class="player-class-header"
+        data-toggle-class="${group}"
+      >
+
+        <span>
+          CLASS ${group}
+
+          <small>
+            ${players.length}
+            jogador${players.length === 1 ? "" : "es"}
+          </small>
+        </span>
+
+        <span class="class-arrow">^</span>
+
+      </button>
+
+      <div
+        class="player-class-content"
+        data-class-content="${group}"
+        style="display:none"
+      >
+
+        <div class="players-table-head">
+          <span>CLASS</span>
+          <span>NICK</span>
+          <span>TIME</span>
+          <span>WAGE</span>
+        </div>
+
+        ${
+          players.length
+            ? players.map(renderPlayerRow).join("")
+            : `
+              <div class="player-empty">
+                Nenhum jogador nessa classe.
+              </div>
+            `
+        }
+
+      </div>
+
+    </section>
+  `;
+}
+
+function renderPlayerRow(player) {
+  const team = getTeam(player);
+
+  const playerClass = player.class || "D";
+
+  const baseClass =
+    getBaseClass(playerClass).toLowerCase();
+
+  let teamHTML = "";
+
+  if (!team) {
+
+    teamHTML = `
+      <span class="free-agent">
+        🏷️ FREE AGENT
+      </span>
+    `;
+
+  } else {
+
+    teamHTML = `
+      <span class="team-cell">
+
+        ${
+          team.logo
+            ? `
+              <img
+                src="${escapeHTML(team.logo)}"
+                class="team-shield"
+                alt=""
+              >
+            `
+            : ""
+        }
+
+        <span>
+          ${escapeHTML(team.name)}
+        </span>
+
+      </span>
+    `;
+
+  }
+
+  return `
+    <div
+      class="player-row"
+      draggable="${isAdmin ? "true" : "false"}"
+      data-player-id="${escapeHTML(player.id)}"
+      data-player-class="${escapeHTML(playerClass)}"
+    >
+
+      <span>
+
+        <span class="class-badge class-${baseClass}">
+          ${escapeHTML(playerClass)}
+        </span>
+
+      </span>
+
+      <span class="player-nick">
+        ${escapeHTML(
+          player.nick ||
+          player.name ||
+          "Sem nome"
+        )}
+      </span>
+
+      <span>
+        ${teamHTML}
+      </span>
+
+      <span class="player-wage">
+        ${escapeHTML(
+          getPlayerWage(player)
+        )}
+      </span>
+
+    </div>
+  `;
+}
+
+function togglePlayerGroup(group) {
+
+  const container =
+    document.querySelector(
+      `[data-class-content="${group}"]`
+    );
+
+  const button =
+    document.querySelector(
+      `[data-toggle-class="${group}"]`
+    );
+
+  if (!container || !button) return;
+
+  const arrow =
+    button.querySelector(".class-arrow");
+
+  const isClosed =
+    container.style.display === "none" ||
+    container.style.display === "";
+
+  container.style.display =
+    isClosed ? "block" : "none";
+
+  if (arrow) {
+    arrow.textContent =
+      isClosed ? "v" : "^";
+  }
+}
+
+
+/* =========================
+   DRAG AND DROP
+========================= */
+
+function setupDragAndDrop() {
+
+  if (!isAdmin) return;
+
+  document
+    .querySelectorAll(
+      ".player-row[draggable='true']"
+    )
+    .forEach(row => {
+
+      row.addEventListener(
+        "dragstart",
+        () => {
+          row.classList.add("dragging");
+        }
+      );
+
+      row.addEventListener(
+        "dragend",
+        async () => {
+
+          row.classList.remove(
+            "dragging"
+          );
+
+          await savePlayerOrder();
+        }
+      );
+
+      row.addEventListener(
+        "dragover",
+        event => {
+
+          event.preventDefault();
+
+          const dragging =
+            document.querySelector(
+              ".player-row.dragging"
+            );
+
+          if (!dragging || dragging === row) {
+            return;
+          }
+
+          const group1 =
+            dragging.closest(
+              "[data-class-group]"
+            );
+
+          const group2 =
+            row.closest(
+              "[data-class-group]"
+            );
+
+          if (!group1 || !group2) return;
+
+          if (
+            group1.dataset.classGroup !==
+            group2.dataset.classGroup
+          ) {
+            return;
+          }
+
+          const rect =
+            row.getBoundingClientRect();
+
+          const after =
+            event.clientY >
+            rect.top +
+            rect.height / 2;
+
+          if (after) {
+
+            row.parentNode.insertBefore(
+              dragging,
+              row.nextSibling
+            );
+
+          } else {
+
+            row.parentNode.insertBefore(
+              dragging,
+              row
+            );
+
+          }
+
+        }
+      );
+
+    });
+}
+
+async function savePlayerOrder() {
+
+  const groups =
+    document.querySelectorAll(
+      "[data-class-content]"
+    );
+
+  const order = [];
+
+  groups.forEach(group => {
+
+    group
+      .querySelectorAll(".player-row")
+      .forEach((row, index) => {
+
+        order.push({
+          id: row.dataset.playerId,
+          order: index
+        });
+
+      });
+
+  });
+
+  try {
+
+    await api(
+      "/api/admin/players/reorder",
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          order
+        })
+      }
+    );
+
+    await loadData();
+
+  } catch (error) {
+
+    console.error(error);
+
+  }
+}
+
+
+/* =========================
+   SELECTIONS
+========================= */
+
+function renderSelections() {
+
+  content.innerHTML = `
+    <div class="page-header">
+      <h2>Seleções</h2>
+      <p>
+        Seleções cadastradas na UTL.
+      </p>
+    </div>
+
+    ${
+      data.selections.length
+        ? `
+          <div class="cards-grid">
+
+            ${data.selections.map(
+              selection => `
+
+              <article class="team-card">
+
+                ${
+                  selection.logo
+                    ? `
+                      <img
+                        src="${escapeHTML(
+                          selection.logo
+                        )}"
+                        class="team-logo-large"
+                        alt=""
+                      >
+                    `
+                    : `
+                      <div class="team-logo-placeholder">
+                        🌎
+                      </div>
+                    `
+                }
+
+                <h3>
+                  ${escapeHTML(
+                    selection.name
+                  )}
+                </h3>
+
+                <p>
+                  ${
+                    Array.isArray(
+                      selection.playerIds
+                    )
+                      ? selection.playerIds.length
+                      : 0
+                  }
+                  jogadores
+                </p>
+
+                ${
+                  isAdmin
+                    ? `
+                      <button
+                        class="danger-button small"
+                        data-delete-selection="${escapeHTML(
+                          selection.id
+                        )}"
+                      >
+                        Excluir
+                      </button>
+                    `
+                    : ""
+                }
+
+              </article>
+
+            `
+            ).join("")}
+
+          </div>
+        `
+        : `
+          <div class="card empty">
+            <p>
+              Nenhuma seleção cadastrada.
+            </p>
+          </div>
+        `
+    }
+  `;
+}
+
+
+/* =========================
+   TEAMS
+========================= */
+
+function renderTeams() {
+
+  content.innerHTML = `
+    <div class="page-header">
+      <h2>Times</h2>
+      <p>
+        Times cadastrados na UTL.
+      </p>
+    </div>
+
+    ${
+      data.teams.length
+        ? `
+          <div class="cards-grid">
+
+            ${data.teams.map(
+              team => `
+
+              <article class="team-card">
+
+                ${
+                  team.logo
+                    ? `
+                      <img
+                        src="${escapeHTML(
+                          team.logo
+                        )}"
+                        class="team-logo-large"
+                        alt=""
+                      >
+                    `
+                    : `
+                      <div class="team-logo-placeholder">
+                        ⚽
+                      </div>
+                    `
+                }
+
+                <h3>
+                  ${escapeHTML(team.name)}
+                </h3>
+
+                <p>
+                  ${
+                    data.players.filter(
+                      player =>
+                        String(
+                          player.teamId
+                        ) ===
+                        String(team.id)
+                    ).length
+                  }
+                  jogadores
+                </p>
+
+                ${
+                  isAdmin
+                    ? `
+                      <button
+                        class="danger-button small"
+                        data-delete-team="${escapeHTML(
+                          team.id
+                        )}"
+                      >
+                        Excluir
+                      </button>
+                    `
+                    : ""
+                }
+
+              </article>
+
+            `
+            ).join("")}
+
+          </div>
+        `
+        : `
+          <div class="card empty">
+            <p>
+              Nenhum time cadastrado.
+            </p>
+          </div>
+        `
+    }
+  `;
+}
