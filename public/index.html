@@ -11,150 +11,110 @@
 
 <body>
 
-  <aside class="sidebar">
+  <div class="app">
 
-    <div class="logo">
-      <img src="/images/logo.png" alt="UTL">
-      <span>ULTIMATE TCS LEAGUE</span>
-    </div>
+    <aside class="sidebar" id="sidebar">
 
-    <nav>
+      <div class="brand">
 
-      <div class="menu-title">LEAGUE</div>
+        <img
+          src="/images/logo.png"
+          alt="UTL"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='block'"
+        >
 
-      <button data-page="news">
-        📰 News
-      </button>
+        <span class="brand-fallback">UTL</span>
 
-      <button data-page="table">
-        📊 Tabela
-      </button>
-
-      <div class="menu-title">SPREADSHEETS</div>
-
-      <button data-page="players">
-        👤 Jogadores
-      </button>
-
-      <button data-page="selections">
-        🌎 Seleções
-      </button>
-
-      <button data-page="teams">
-        ⚽ Times
-      </button>
-
-      <div class="menu-title">ADMIN</div>
-
-      <button data-page="admin">
-        ⚙️ Admin Area
-      </button>
-
-    </nav>
-
-    <div class="sidebar-footer">
-      © 2026 UTL
-    </div>
-
-  </aside>
-
-
-  <main class="main">
-
-    <header class="topbar">
-
-      <button id="mobileMenu" class="mobile-menu">
-        ☰
-      </button>
-
-      <div>
-        <h2 id="page-title">
+        <small>
           ULTIMATE TCS LEAGUE
-        </h2>
+        </small>
 
-        <span class="page-subtitle">
-          Site oficial
-        </span>
       </div>
 
-    </header>
+      <nav>
+
+        <button
+          data-page="news"
+          class="nav active"
+        >
+          <span>News</span>
+        </button>
+
+        <button
+          data-page="table"
+          class="nav"
+        >
+          <span>Tabela</span>
+        </button>
+
+        <button
+          data-page="players"
+          class="nav"
+        >
+          <span>Jogadores</span>
+        </button>
+
+        <button
+          data-page="selections"
+          class="nav"
+        >
+          <span>Seleções</span>
+        </button>
+
+        <button
+          data-page="teams"
+          class="nav"
+        >
+          <span>Times</span>
+        </button>
+
+        <button
+          data-page="admin"
+          class="nav"
+        >
+          <span>Admin Area</span>
+        </button>
+
+      </nav>
+
+    </aside>
 
 
-    <section id="page-content" class="content">
+    <main class="main">
 
-      <div class="home-page">
+      <header class="topbar">
 
-        <div class="hero">
+        <button
+          class="hamb"
+          id="mobileMenu"
+          aria-label="Abrir menu"
+        >
+          ☰
+        </button>
 
-          <div class="hero-content">
+        <div>
 
-            <img
-              src="/images/logo.png"
-              class="hero-logo"
-              alt="UTL"
-            >
+          <b id="page-title">
+            News
+          </b>
 
-            <h1>
-              ULTIMATE TCS LEAGUE
-            </h1>
-
-            <p>
-              Site oficial da UTL.
-            </p>
-
-          </div>
+          <span>
+            ULTIMATE TCS LEAGUE
+          </span>
 
         </div>
 
-      </div>
-
-    </section>
-
-  </main>
+      </header>
 
 
-  <!-- LOGIN ADMIN -->
+      <section id="page-content"></section>
 
-  <div id="login-modal" class="modal hidden">
-
-    <div class="modal-box">
-
-      <button
-        id="close-login"
-        class="modal-close"
-      >
-        ×
-      </button>
-
-      <h2>
-        Área Administrativa
-      </h2>
-
-      <p>
-        Digite a senha de administrador.
-      </p>
-
-      <input
-        id="admin-password"
-        type="password"
-        placeholder="Senha"
-      >
-
-      <button
-        id="login-button"
-        class="primary-button"
-      >
-        Entrar
-      </button>
-
-      <div
-        id="login-error"
-        class="login-error"
-      ></div>
-
-    </div>
+    </main>
 
   </div>
+
+
+  <div id="toast"></div>
 
 
   <script src="/app.js"></script>
