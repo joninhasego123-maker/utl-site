@@ -2424,11 +2424,3 @@ if (modal) {
   await checkAdmin();
   await loadData();
 })();
-const mobileMenu = document.getElementById("mobileMenu");
-const sidebar = document.querySelector(".sidebar");
-
-if (mobileMenu && sidebar) {
-  mobileMenu.addEventListener("click", () => {
-    sidebar.classList.toggle("mobile-open");
-  });
-}
