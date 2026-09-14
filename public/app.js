@@ -1,3 +1,5 @@
+alert("APP.JS FOI CARREGADO");
+
 let data = {
   links: {},
   tableUrl: "",
