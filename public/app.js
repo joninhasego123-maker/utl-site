@@ -147,6 +147,7 @@ function showLogin() {
   const modal = document.getElementById("login-modal");
 
   if (modal) {
+    modal.classList.remove("hidden");
     modal.classList.add("active");
 
     const input = document.getElementById("admin-password");
@@ -163,6 +164,7 @@ function hideLogin() {
 
   if (modal) {
     modal.classList.remove("active");
+    modal.classList.add("hidden");
   }
 }
 
