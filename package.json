@@ -1,6 +1,6 @@
 {
   "name": "utl-site",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "Site oficial da ULTIMATE TCS LEAGUE",
   "main": "server.js",
   "scripts": {
