@@ -746,3 +746,197 @@ label {
   }
 
 }
+
+/* =========================
+   JOGADORES — NOVO VISUAL
+   ========================= */
+
+.players-container {
+  background: #101010;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 22px;
+  padding: 18px;
+}
+
+.player-class-group {
+  margin-bottom: 12px;
+}
+
+.player-class-header {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  background: #181818;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+
+  color: #fff;
+  cursor: pointer;
+  transition: .2s;
+}
+
+.player-class-header:hover {
+  background: #202020;
+}
+
+.player-class-header .arrow {
+  font-size: 18px;
+  transition: transform .2s;
+}
+
+/* Área onde ficam os jogadores */
+.player-class-list {
+  margin-top: 6px;
+  background: #0b0b0b;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+/* Cabeçalho da tabela */
+.players-table-header {
+  display: grid;
+  grid-template-columns: 90px 1fr 180px 120px;
+  align-items: center;
+
+  min-height: 42px;
+  padding: 0 16px;
+
+  background: #151515;
+  color: #888;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Linha de jogador */
+.player-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 180px 120px;
+  align-items: center;
+
+  min-height: 58px;
+  padding: 0 16px;
+
+  background: #101010;
+  border-top: 1px solid rgba(255,255,255,.05);
+}
+
+.player-row:hover {
+  background: #171717;
+}
+
+/* Badge da classe */
+.player-class-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: fit-content;
+  min-width: 42px;
+  padding: 5px 10px;
+
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 13px;
+
+  background: rgba(255,255,255,.08);
+}
+
+/* Nick */
+.player-nick {
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Time */
+.player-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  color: #ccc;
+}
+
+.player-team img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+/* Free Agent */
+.player-free-agent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ccc;
+}
+
+/* Salário */
+.player-wage {
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Classes */
+.class-x .player-class-badge {
+  color: #c77dff;
+  background: rgba(156, 39, 255, .16);
+}
+
+.class-s .player-class-badge {
+  color: #4da6ff;
+  background: rgba(0, 123, 255, .16);
+}
+
+.class-a .player-class-badge {
+  color: #ff4d4d;
+  background: rgba(255, 0, 0, .14);
+}
+
+.class-b .player-class-badge {
+  color: #ff9d3d;
+  background: rgba(255, 136, 0, .14);
+}
+
+.class-c .player-class-badge {
+  color: #ffd84d;
+  background: rgba(255, 204, 0, .14);
+}
+
+.class-d .player-class-badge {
+  color: #aaa;
+  background: rgba(150,150,150,.14);
+}
+
+/* Celular */
+@media (max-width: 700px) {
+  .players-container {
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .players-table-header,
+  .player-row {
+    grid-template-columns: 55px 1fr 110px 75px;
+    padding: 0 10px;
+  }
+
+  .player-team {
+    font-size: 12px;
+  }
+
+  .player-team img {
+    width: 22px;
+    height: 22px;
+  }
+
+  .player-wage {
+    font-size: 12px;
+  }
+}
