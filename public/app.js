@@ -1,5 +1,13 @@
 alert("APP.JS FOI CARREGADO");
 
+document.addEventListener("click", function(e) {
+  const botao = e.target.closest("[data-page]");
+
+  if (!botao) return;
+
+  alert("CLIQUEI: " + botao.dataset.page);
+});
+
 let data = {
   links: {},
   tableUrl: "",
