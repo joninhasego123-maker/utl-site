@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>ULTIMATE TCS LEAGUE</title>
+
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div class="logo">
+      <span>UTL</span>
+      <small>ULTIMATE TCS LEAGUE</small>
+    </div>
+
+    <nav>
+
+      <button data-page="home">
+        🏠 Início
+      </button>
+
+      <div class="menu-title">
+        OTHERS
+      </div>
+
+      <button data-page="others">
+        🔗 Discord / TikTok
+      </button>
+
+      <div class="menu-title">
+        LEAGUE
+      </div>
+
+      <button data-page="news">
+        📰 News
+      </button>
+
+      <button data-page="table">
+        📊 Tabela
+      </button>
+
+      <div class="menu-title">
+        SPREADSHEETS
+      </div>
+
+      <button data-page="players">
+        👤 Jogadores
+      </button>
+
+      <button data-page="selections">
+        🌎 Seleções
+      </button>
+
+      <button data-page="teams">
+        ⚽ Times
+      </button>
+
+      <div class="menu-title">
+        ADMIN
+      </div>
+
+      <button data-page="admin">
+        ⚙️ Admin Area
+      </button>
+
+    </nav>
+
+    <div class="sidebar-footer">
+      © 2026 UTL
+    </div>
+
+  </aside>
+
+
+  <!-- CONTEÚDO -->
+  <main class="main">
+
+    <header class="topbar">
+
+      <button id="mobileMenu" class="mobile-menu">
+        ☰
+      </button>
+
+      <div>
+        <h2 id="page-title">
+          ULTIMATE TCS LEAGUE
+        </h2>
+
+        <span class="page-subtitle">
+          Site oficial
+        </span>
+      </div>
+
+    </header>
+
+
+    <section id="page-content" class="content">
+
+      <!-- HOME -->
+      <div class="home-page">
+
+        <div class="hero">
+
+          <div class="hero-content">
+
+            <span class="hero-tag">
+              UTL
+            </span>
+
+            <h1>
+              ULTIMATE TCS LEAGUE
+            </h1>
+
+            <p>
+              Bem-vindo ao site oficial da UTL.
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- LOGIN ADMIN -->
+  <div id="login-modal" class="modal hidden">
+
+    <div class="modal-box">
+
+      <button
+        id="close-login"
+        class="modal-close"
+      >
+        ×
+      </button>
+
+      <h2>
+        Área Administrativa
+      </h2>
+
+      <p>
+        Digite a senha de administrador.
+      </p>
+
+      <input
+        id="admin-password"
+        type="password"
+        placeholder="Senha"
+      >
+
+      <button
+        id="login-button"
+        class="primary-button"
+      >
+        Entrar
+      </button>
+
+      <div
+        id="login-error"
+        class="login-error"
+      ></div>
+
+    </div>
+
+  </div>
+
+
+  <script src="/app.js"></script>
+
+</body>
+</html>
