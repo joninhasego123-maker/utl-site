@@ -1,3 +1,334 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --red: #e50914;
+  --red-dark: #a80009;
+  --bg: #080808;
+  --panel: #111111;
+  --panel-2: #161616;
+  --border: rgba(255,255,255,.08);
+  --text: #ffffff;
+  --muted: #999999;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* =========================
+   SIDEBAR
+   ========================= */
+
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 245px;
+  height: 100vh;
+  background: #0d0d0d;
+  border-right: 1px solid var(--border);
+  padding: 25px 15px;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+
+.logo {
+  padding: 5px 10px 25px;
+}
+
+.logo span {
+  display: block;
+  font-size: 38px;
+  font-weight: 900;
+  color: var(--red);
+  letter-spacing: -2px;
+}
+
+.logo small {
+  color: #777;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar nav button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #bbb;
+  padding: 12px 14px;
+  border-radius: 9px;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+  transition: .2s;
+}
+
+.sidebar nav button:hover {
+  background: #181818;
+  color: #fff;
+}
+
+.sidebar nav button.active {
+  background: rgba(229,9,20,.14);
+  color: #fff;
+  border-left: 3px solid var(--red);
+}
+
+.menu-title {
+  color: #555;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  margin: 22px 10px 7px;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  color: #444;
+  font-size: 11px;
+  padding: 10px;
+}
+
+/* =========================
+   MAIN
+   ========================= */
+
+.main {
+  margin-left: 245px;
+  min-height: 100vh;
+}
+
+.topbar {
+  height: 75px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 30px;
+  background: rgba(8,8,8,.95);
+}
+
+.topbar h2 {
+  font-size: 20px;
+}
+
+.page-subtitle {
+  display: block;
+  color: #666;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.content {
+  padding: 30px;
+  max-width: 1500px;
+  margin: auto;
+}
+
+.mobile-menu {
+  display: none;
+}
+
+/* =========================
+   HOME
+   ========================= */
+
+.hero {
+  min-height: 360px;
+  border-radius: 18px;
+  background: linear-gradient(
+    120deg,
+    rgba(229,9,20,.85),
+    rgba(40,0,0,.85)
+  );
+  display: flex;
+  align-items: center;
+  padding: 45px;
+  overflow: hidden;
+  position: relative;
+}
+
+.hero::after {
+  content: "UTL";
+  position: absolute;
+  right: 30px;
+  bottom: -50px;
+  font-size: 220px;
+  font-weight: 900;
+  opacity: .06;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-tag {
+  display: inline-block;
+  background: rgba(255,255,255,.12);
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 15px;
+}
+
+.hero h1 {
+  font-size: 42px;
+  margin-bottom: 10px;
+}
+
+.hero p {
+  color: #ddd;
+}
+
+/* =========================
+   PAGE HEADER
+   ========================= */
+
+.page-header {
+  margin-bottom: 25px;
+}
+
+.page-header h2 {
+  font-size: 28px;
+  margin-bottom: 7px;
+}
+
+.page-header p {
+  color: var(--muted);
+}
+
+/* =========================
+   CARDS
+   ========================= */
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 18px;
+}
+
+/* =========================
+   LINKS
+   ========================= */
+
+.links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 18px;
+}
+
+.link-card {
+  display: block;
+  text-decoration: none;
+  color: #fff;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+  transition: .2s;
+}
+
+.link-card:hover {
+  border-color: rgba(229,9,20,.5);
+  transform: translateY(-2px);
+}
+
+.link-card h3 {
+  margin-bottom: 7px;
+}
+
+.link-card p {
+  color: #777;
+  font-size: 13px;
+}
+
+/* =========================
+   NEWS
+   ========================= */
+
+.news-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.news-filter {
+  border: 1px solid var(--border);
+  background: #121212;
+  color: #aaa;
+  border-radius: 8px;
+  padding: 8px 13px;
+  cursor: pointer;
+}
+
+.news-filter:hover,
+.news-filter.active {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+
+.news-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.news-card {
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.news-card img {
+  display: block;
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+}
+
+.news-card-content {
+  padding: 18px;
+}
+
+.news-card-content h3 {
+  margin-bottom: 8px;
+}
+
+.news-card-content p {
+  color: #999;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
 /* =========================
    JOGADORES
    ========================= */
@@ -13,6 +344,12 @@
   margin-bottom: 12px;
 }
 
+.player-class-section:last-child {
+  margin-bottom: 0;
+}
+
+/* Categoria */
+
 .player-class-header {
   width: 100%;
   min-height: 54px;
@@ -25,6 +362,11 @@
   border-radius: 14px;
   color: #fff;
   cursor: pointer;
+  transition: .2s;
+}
+
+.player-class-header:hover {
+  background: #202020;
 }
 
 .player-class-header small {
@@ -34,19 +376,24 @@
 
 .class-arrow {
   font-size: 18px;
+  color: #aaa;
 }
+
+/* Área aberta */
 
 .player-class-content {
   margin-top: 6px;
   background: #0b0b0b;
   border: 1px solid rgba(255,255,255,.06);
   overflow-x: auto;
+  border-radius: 10px;
 }
 
-/* CABEÇALHO */
+/* Cabeçalho da tabela */
 
 .players-table-head {
   display: grid;
+
   grid-template-columns:
     80px
     minmax(150px, 1.5fr)
@@ -55,21 +402,31 @@
     minmax(140px, 1fr)
     100px
     80px;
+
   align-items: center;
+
   min-height: 44px;
+
   padding: 0 16px;
+
   background: #151515;
+
   color: #888;
+
   font-size: 12px;
+
   font-weight: 700;
+
   text-transform: uppercase;
+
   min-width: 850px;
 }
 
-/* LINHA */
+/* Linha do jogador */
 
 .player-row {
   display: grid;
+
   grid-template-columns:
     80px
     minmax(150px, 1.5fr)
@@ -78,11 +435,17 @@
     minmax(140px, 1fr)
     100px
     80px;
+
   align-items: center;
+
   min-height: 58px;
+
   padding: 0 16px;
+
   background: #101010;
+
   border-top: 1px solid rgba(255,255,255,.05);
+
   min-width: 850px;
 }
 
@@ -96,137 +459,610 @@
   color: #aaa;
   font-size: 13px;
   font-family: monospace;
+  white-space: nowrap;
 }
 
-/* NICK */
+/* Nick */
 
 .player-nick {
   font-weight: 600;
   color: #fff;
+
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* CLASS */
+/* Classe */
 
 .class-badge {
   display: inline-flex;
+
   align-items: center;
   justify-content: center;
+
   min-width: 42px;
+
   width: fit-content;
+
   padding: 5px 10px;
+
   border-radius: 8px;
+
   font-weight: 800;
+
   font-size: 13px;
 }
 
-/* TIME */
+/* X */
+
+.class-x .class-badge {
+  color: #c77dff;
+  background: rgba(156,39,255,.16);
+  border: 1px solid rgba(156,39,255,.25);
+}
+
+/* S */
+
+.class-s .class-badge {
+  color: #4da6ff;
+  background: rgba(0,123,255,.16);
+  border: 1px solid rgba(0,123,255,.25);
+}
+
+/* A */
+
+.class-a .class-badge {
+  color: #ff4d4d;
+  background: rgba(255,0,0,.14);
+  border: 1px solid rgba(255,0,0,.22);
+}
+
+/* B */
+
+.class-b .class-badge {
+  color: #ff9d3d;
+  background: rgba(255,136,0,.14);
+  border: 1px solid rgba(255,136,0,.22);
+}
+
+/* C */
+
+.class-c .class-badge {
+  color: #ffd84d;
+  background: rgba(255,204,0,.14);
+  border: 1px solid rgba(255,204,0,.22);
+}
+
+/* D */
+
+.class-d .class-badge {
+  color: #aaa;
+  background: rgba(150,150,150,.14);
+  border: 1px solid rgba(150,150,150,.22);
+}
+
+/* Time */
 
 .team-cell {
   display: flex;
+
   align-items: center;
+
   gap: 8px;
+
   color: #ccc;
+
   white-space: nowrap;
 }
 
 .team-shield {
   width: 26px;
   height: 26px;
+
   object-fit: contain;
+
   flex-shrink: 0;
 }
 
+/* Free Agent */
+
 .free-agent {
   display: flex;
+
   align-items: center;
+
   gap: 6px;
+
   color: #ccc;
+
   white-space: nowrap;
 }
 
-/* ROLE */
+/* Role */
 
 .player-role {
   color: #ccc;
+
   font-size: 13px;
+
   white-space: nowrap;
 }
 
-/* WAGE */
+/* Wage */
 
 .player-wage {
   font-weight: 700;
+
   color: #fff;
+
   white-space: nowrap;
 }
 
-/* SETAS */
+/* Setas */
 
 .player-order-actions {
   display: flex;
+
   align-items: center;
+
   justify-content: center;
+
   gap: 5px;
 }
 
 .player-move-button {
   width: 30px;
   height: 30px;
+
   border: 1px solid rgba(255,255,255,.1);
+
   border-radius: 7px;
+
   background: #191919;
+
   color: #fff;
+
   cursor: pointer;
+
   font-size: 14px;
+
+  transition: .15s;
 }
 
 .player-move-button:hover {
   background: #252525;
+
+  border-color: rgba(229,9,20,.45);
+
+  color: #fff;
 }
 
-/* CORES DAS CLASSES */
+/* Jogador vazio */
 
-.class-x .class-badge {
-  color: #c77dff;
-  background: rgba(156, 39, 255, .16);
+.player-empty {
+  min-width: 850px;
+
+  padding: 25px;
+
+  text-align: center;
+
+  color: #666;
+
+  font-size: 13px;
 }
 
-.class-s .class-badge {
-  color: #4da6ff;
-  background: rgba(0, 123, 255, .16);
+/* =========================
+   SELEÇÕES / TIMES
+   ========================= */
+
+.selection-grid,
+.team-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(auto-fill, minmax(250px, 1fr));
+
+  gap: 18px;
 }
 
-.class-a .class-badge {
-  color: #ff4d4d;
-  background: rgba(255, 0, 0, .14);
+.selection-card,
+.team-card {
+  background: var(--panel);
+
+  border: 1px solid var(--border);
+
+  border-radius: 16px;
+
+  padding: 18px;
+
+  transition: .2s;
 }
 
-.class-b .class-badge {
-  color: #ff9d3d;
-  background: rgba(255, 136, 0, .14);
+.selection-card:hover,
+.team-card:hover {
+  border-color: rgba(229,9,20,.4);
 }
 
-.class-c .class-badge {
-  color: #ffd84d;
-  background: rgba(255, 204, 0, .14);
+.selection-card img,
+.team-card img {
+  width: 70px;
+  height: 70px;
+
+  object-fit: contain;
+
+  margin-bottom: 12px;
 }
 
-.class-d .class-badge {
-  color: #aaa;
-  background: rgba(150,150,150,.14);
+.selection-card h3,
+.team-card h3 {
+  margin-bottom: 5px;
 }
 
-/* CELULAR */
+.selection-card p,
+.team-card p {
+  color: #777;
 
-@media (max-width: 700px) {
+  font-size: 13px;
+}
 
-  .players-container {
-    padding: 10px;
-    border-radius: 16px;
+/* =========================
+   ADMIN
+   ========================= */
+
+.admin-section {
+  background: var(--panel);
+
+  border: 1px solid var(--border);
+
+  border-radius: 16px;
+
+  padding: 22px;
+
+  margin-bottom: 20px;
+}
+
+.admin-section h3 {
+  margin-bottom: 18px;
+}
+
+.admin-form {
+  display: grid;
+
+  gap: 12px;
+}
+
+.admin-form input,
+.admin-form textarea,
+.admin-form select {
+  width: 100%;
+
+  background: #0b0b0b;
+
+  border: 1px solid rgba(255,255,255,.1);
+
+  border-radius: 9px;
+
+  color: #fff;
+
+  padding: 11px 13px;
+
+  outline: none;
+
+  font-family: inherit;
+}
+
+.admin-form textarea {
+  min-height: 100px;
+
+  resize: vertical;
+}
+
+.admin-form input:focus,
+.admin-form textarea:focus,
+.admin-form select:focus {
+  border-color: var(--red);
+}
+
+.primary-button {
+  border: 0;
+
+  background: var(--red);
+
+  color: #fff;
+
+  border-radius: 9px;
+
+  padding: 11px 16px;
+
+  cursor: pointer;
+
+  font-weight: 700;
+
+  transition: .2s;
+}
+
+.primary-button:hover {
+  background: #ff1722;
+}
+
+.danger-button {
+  border: 1px solid rgba(229,9,20,.35);
+
+  background: rgba(229,9,20,.08);
+
+  color: #ff5a60;
+
+  border-radius: 8px;
+
+  padding: 8px 12px;
+
+  cursor: pointer;
+}
+
+.danger-button:hover {
+  background: rgba(229,9,20,.16);
+}
+
+.admin-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 8px;
+}
+
+.admin-list-item {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 15px;
+
+  background: #0b0b0b;
+
+  border: 1px solid rgba(255,255,255,.06);
+
+  border-radius: 10px;
+
+  padding: 12px;
+}
+
+/* =========================
+   MODAL
+   ========================= */
+
+.modal {
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 999;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 20px;
+
+  background: rgba(0,0,0,.75);
+
+  backdrop-filter: blur(5px);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-box {
+  position: relative;
+
+  width: 100%;
+
+  max-width: 420px;
+
+  background: #121212;
+
+  border: 1px solid rgba(255,255,255,.1);
+
+  border-radius: 18px;
+
+  padding: 28px;
+
+  box-shadow: 0 20px 70px rgba(0,0,0,.5);
+}
+
+.modal-box h2 {
+  margin-bottom: 8px;
+}
+
+.modal-box p {
+  color: #888;
+
+  font-size: 13px;
+
+  margin-bottom: 18px;
+}
+
+.modal-box input {
+  width: 100%;
+
+  background: #090909;
+
+  border: 1px solid rgba(255,255,255,.1);
+
+  color: #fff;
+
+  border-radius: 9px;
+
+  padding: 12px;
+
+  outline: none;
+
+  margin-bottom: 12px;
+}
+
+.modal-box input:focus {
+  border-color: var(--red);
+}
+
+.modal-box .primary-button {
+  width: 100%;
+}
+
+.modal-close {
+  position: absolute;
+
+  right: 14px;
+
+  top: 12px;
+
+  border: 0;
+
+  background: transparent;
+
+  color: #777;
+
+  font-size: 25px;
+
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  color: #fff;
+}
+
+.login-error {
+  color: #ff5555;
+
+  font-size: 12px;
+
+  margin-top: 10px;
+
+  text-align: center;
+}
+
+/* =========================
+   TABLE / IFRAME
+   ========================= */
+
+.table-container {
+  width: 100%;
+
+  background: var(--panel);
+
+  border: 1px solid var(--border);
+
+  border-radius: 16px;
+
+  overflow: hidden;
+}
+
+.table-container iframe {
+  width: 100%;
+
+  min-height: 700px;
+
+  border: 0;
+}
+
+/* =========================
+   SCROLLBAR
+   ========================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080808;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #292929;
+
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
+}
+
+/* =========================
+   MOBILE
+   ========================= */
+
+@media (max-width: 768px) {
+
+  .sidebar {
+    width: 245px;
+
+    transform: translateX(-100%);
+
+    transition: transform .25s ease;
   }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main {
+    margin-left: 0;
+  }
+
+  .topbar {
+    padding: 0 18px;
+  }
+
+  .mobile-menu {
+    display: block;
+
+    background: transparent;
+
+    border: 0;
+
+    color: white;
+
+    font-size: 24px;
+
+    cursor: pointer;
+
+    margin-right: 15px;
+  }
+
+  .content {
+    padding: 20px 15px;
+  }
+
+  .hero {
+    min-height: 300px;
+
+    padding: 30px;
+  }
+
+  .hero h1 {
+    font-size: 30px;
+  }
+
+  .page-header h2 {
+    font-size: 24px;
+  }
+
+  .cards-grid,
+  .links-grid,
+  .news-grid,
+  .selection-grid,
+  .team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Tabela de jogadores continua horizontal,
+     permitindo arrastar para os lados */
 
   .players-table-head,
   .player-row {
@@ -240,7 +1076,12 @@
       75px;
 
     min-width: 705px;
+
     padding: 0 10px;
+  }
+
+  .player-id {
+    font-size: 11px;
   }
 
   .player-nick,
@@ -249,8 +1090,23 @@
     font-size: 12px;
   }
 
+  .team-cell {
+    font-size: 12px;
+  }
+
   .team-shield {
     width: 22px;
     height: 22px;
+  }
+
+  .player-move-button {
+    width: 27px;
+    height: 27px;
+  }
+
+  .admin-list-item {
+    align-items: flex-start;
+
+    flex-direction: column;
   }
 }
