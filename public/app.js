@@ -1,7 +1,10 @@
-let data = {
-  links: {},
-  tableUrl: "",
-  categories: [],
+let DATA = {
+  links: {
+    discord: "",
+    tiktok: "",
+    tabela: ""
+  },
+  newsCategories: ["Geral"],
   news: [],
   players: [],
   selections: [],
@@ -9,9 +12,8 @@ let data = {
 };
 
 let isAdmin = false;
-let currentPage = "home";
 
-const classOrder = [
+const CLASS_ORDER = [
   "X",
   "S+",
   "S",
@@ -28,7 +30,7 @@ const classOrder = [
   "D"
 ];
 
-const classGroups = [
+const CLASS_GROUPS = [
   "X",
   "S",
   "A",
@@ -37,7 +39,7 @@ const classGroups = [
   "D"
 ];
 
-const wages = {
+const WAGES = {
   "X": "380K–400K",
   "S+": "350K",
   "S": "325K",
@@ -54,304 +56,321 @@ const wages = {
   "D": "75K"
 };
 
-const content =
-  document.getElementById("page-content");
-
-const pageTitle =
-  document.getElementById("page-title");
-
-const sidebar =
-  document.querySelector(".sidebar");
+const $ = selector => document.querySelector(selector);
 
 function escapeHTML(value) {
-  return String(value ?? "").replace(
-    /[&<>"']/g,
-    char => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;"
-    }[char])
-  );
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  }[char]));
 }
 
-function getBaseClass(playerClass) {
-  return String(playerClass || "D")
-    .toUpperCase()
-    .replace("+", "")
-    .replace("-", "");
+function playerNick(player) {
+  return player.nick ?? player.name ?? "Sem nome";
+}
+
+function playerClass(player) {
+  return player.class ?? player.className ?? "D";
+}
+
+function playerRole(player) {
+  return player.role || "PLAYER";
+}
+
+function playerOverall(player) {
+  if (
+    player.overall === null ||
+    player.overall === undefined ||
+    player.overall === ""
+  ) {
+    return "—";
+  }
+
+  return player.overall;
+}
+
+function playerWage(player) {
+  return WAGES[playerClass(player)] || "—";
+}
+
+function getBaseClass(value) {
+  const c = String(value || "D").toUpperCase();
+
+  if (c === "X") {
+    return "X";
+  }
+
+  return c.charAt(0);
+}
+
+function getClassCSS(value) {
+  return String(value || "D")
+    .toLowerCase()
+    .replace("+", "plus")
+    .replace("-", "minus");
+}
+
+function getPlayerTeamId(player) {
+  return player.teamId ?? player.team ?? "FREE AGENT";
 }
 
 function getTeam(player) {
+  const teamId = getPlayerTeamId(player);
+
   if (
-    player.freeAgent === true ||
-    player.team === "FREE AGENT" ||
-    player.teamId === "FREE AGENT"
+    !teamId ||
+    String(teamId).toUpperCase() === "FREE AGENT"
   ) {
     return null;
   }
 
-  return data.teams.find(team =>
-    String(team.id) ===
-    String(player.teamId || player.team)
-  );
+  return DATA.teams.find(team =>
+    String(team.id) === String(teamId) ||
+    String(team.name) === String(teamId)
+  ) || null;
 }
 
-function getPlayerWage(player) {
-  return wages[player.class] || "—";
+function toast(message) {
+  let toastElement = $("#toast");
+
+  if (!toastElement) {
+    toastElement = document.createElement("div");
+    toastElement.id = "toast";
+
+    toastElement.style.position = "fixed";
+    toastElement.style.right = "20px";
+    toastElement.style.bottom = "20px";
+    toastElement.style.zIndex = "9999";
+    toastElement.style.padding = "12px 18px";
+    toastElement.style.background = "#181818";
+    toastElement.style.border = "1px solid rgba(255,255,255,.12)";
+    toastElement.style.borderRadius = "10px";
+    toastElement.style.color = "#fff";
+    toastElement.style.boxShadow = "0 10px 30px rgba(0,0,0,.4)";
+    toastElement.style.opacity = "0";
+    toastElement.style.pointerEvents = "none";
+    toastElement.style.transition = ".2s";
+
+    document.body.appendChild(toastElement);
+  }
+
+  toastElement.textContent = message;
+  toastElement.style.opacity = "1";
+
+  clearTimeout(toastElement._timer);
+
+  toastElement._timer = setTimeout(() => {
+    toastElement.style.opacity = "0";
+  }, 2200);
 }
 
-function api(url, options = {}) {
-  return fetch(url, {
+async function api(url, options = {}) {
+  const response = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {})
     },
     ...options
   });
+
+  const result = await response
+    .json()
+    .catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      result.error || "Ocorreu um erro."
+    );
+  }
+
+  return result;
 }
+
+
+/* =========================
+   CARREGAR DADOS
+   ========================= */
 
 async function loadData() {
   try {
-    const response =
-      await api("/api/data");
+    const response = await fetch("/api/data");
 
     if (!response.ok) {
-      throw new Error(
-        "Erro ao carregar dados"
-      );
+      throw new Error("Erro ao carregar os dados.");
     }
 
-    const result =
-      await response.json();
+    DATA = await response.json();
 
-    data = {
-      links: result.links || {},
-      tableUrl: result.tableUrl || "",
-      categories:
-        result.categories || [],
-      news:
-        result.news || [],
-      players:
-        result.players || [],
-      selections:
-        result.selections || [],
-      teams:
-        result.teams || []
-    };
+    const statusResponse =
+      await fetch("/api/admin/status");
 
-    renderPage(currentPage);
+    const status =
+      await statusResponse.json();
+
+    isAdmin = !!status.admin;
+
+    render(currentPage);
 
   } catch (error) {
-
     console.error(error);
 
-    content.innerHTML = `
-      <div class="card">
-        <h2>Erro ao carregar o site</h2>
-        <p>
-          Tente atualizar a página.
-        </p>
-      </div>
-    `;
-  }
-}
+    const content = $("#page-content");
 
-async function checkAdmin() {
-  try {
-
-    const response =
-      await api("/api/admin/status");
-
-    if (response.ok) {
-
-      const result =
-        await response.json();
-
-      isAdmin =
-        !!result.isAdmin;
-    }
-
-  } catch {
-
-    isAdmin = false;
-  }
-}
-
-function showLogin() {
-
-  const modal =
-    document.getElementById(
-      "login-modal"
-    );
-
-  if (modal) {
-
-    modal.classList.remove("hidden");
-    modal.classList.add("active");
-
-    const input =
-      document.getElementById(
-        "admin-password"
-      );
-
-    if (input) {
-
-      input.value = "";
-
-      setTimeout(
-        () => input.focus(),
-        100
-      );
+    if (content) {
+      content.innerHTML = `
+        <div class="card">
+          <h3>Erro</h3>
+          <p class="muted">
+            Não foi possível carregar o site.
+          </p>
+        </div>
+      `;
     }
   }
 }
 
-function hideLogin() {
 
-  const modal =
-    document.getElementById(
-      "login-modal"
-    );
+/* =========================
+   NAVEGAÇÃO
+   ========================= */
 
-  if (modal) {
+let currentPage = "news";
 
-    modal.classList.remove(
-      "active"
-    );
+const openClasses = new Set();
+const openNewsCategories = new Set();
 
-    modal.classList.add(
-      "hidden"
-    );
-  }
-}
+function setupNavigation() {
 
-async function login() {
+  document.querySelectorAll("[data-page]")
+    .forEach(button => {
 
-  const input =
-    document.getElementById(
-      "admin-password"
-    );
+      button.addEventListener("click", () => {
 
-  const error =
-    document.getElementById(
-      "login-error"
-    );
+        const page =
+          button.dataset.page;
 
-  const password =
-    input ? input.value : "";
-
-  if (!password) {
-
-    if (error) {
-      error.textContent =
-        "Digite a senha.";
-    }
-
-    return;
-  }
-
-  try {
-
-    const response =
-      await api(
-        "/api/admin/login",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            password
-          })
+        if (
+          page === "admin" &&
+          !isAdmin
+        ) {
+          openLogin();
+          return;
         }
-      );
 
-    const result =
-      await response.json();
+        render(page);
 
-    if (!response.ok) {
+        const sidebar =
+          document.querySelector(".sidebar");
 
-      if (error) {
-        error.textContent =
-          result.error ||
-          "Senha incorreta.";
-      }
+        if (sidebar) {
+          sidebar.classList.remove("open");
+        }
 
-      return;
-    }
+      });
 
-    isAdmin = true;
+    });
 
-    hideLogin();
 
-    renderPage("admin");
+  const mobileMenu =
+    $("#mobileMenu");
 
-  } catch {
+  if (mobileMenu) {
 
-    if (error) {
-      error.textContent =
-        "Erro ao entrar.";
-    }
-  }
-}
+    mobileMenu.addEventListener(
+      "click",
+      () => {
 
-async function logout() {
+        const sidebar =
+          document.querySelector(".sidebar");
 
-  try {
+        if (sidebar) {
+          sidebar.classList.toggle("open");
+        }
 
-    await api(
-      "/api/admin/logout",
-      {
-        method: "POST"
       }
     );
 
-  } catch {}
-
-  isAdmin = false;
-
-  renderPage("home");
-}
-
-function navigate(page) {
-
-  currentPage = page;
-
-  if (sidebar) {
-    sidebar.classList.remove(
-      "open"
-    );
   }
 
-  renderPage(page);
 }
 
-function renderPage(page) {
 
-  if (!content) return;
+/* =========================
+   RENDER PRINCIPAL
+   ========================= */
+
+function render(page) {
 
   currentPage = page;
 
   const titles = {
-    home: "Início",
-    others: "Others",
-    news: "Notícias",
+    news: "News",
     table: "Tabela",
     players: "Jogadores",
     selections: "Seleções",
     teams: "Times",
-    admin: "Área Administrativa"
+    admin: "Admin Area"
   };
 
-  if (pageTitle) {
+  const pageTitle =
+    $("#page-title");
 
+  if (pageTitle) {
     pageTitle.textContent =
       titles[page] || "UTL";
   }
 
+
+  const content =
+    $("#page-content");
+
+  if (!content) {
+    return;
+  }
+
+
+  if (page === "news") {
+    content.innerHTML =
+      renderNews();
+  }
+
+  else if (page === "table") {
+    content.innerHTML =
+      renderTable();
+  }
+
+  else if (page === "players") {
+    content.innerHTML =
+      renderPlayers();
+  }
+
+  else if (page === "selections") {
+    content.innerHTML =
+      renderClubs("selection");
+  }
+
+  else if (page === "teams") {
+    content.innerHTML =
+      renderClubs("team");
+  }
+
+  else if (page === "admin") {
+
+    if (!isAdmin) {
+      openLogin();
+      return;
+    }
+
+    content.innerHTML =
+      renderAdmin();
+  }
+
+
   document
-    .querySelectorAll(
-      "[data-page]"
-    )
+    .querySelectorAll("[data-page]")
     .forEach(button => {
 
       button.classList.toggle(
@@ -361,350 +380,753 @@ function renderPage(page) {
 
     });
 
-  switch (page) {
 
-    case "home":
-      renderHome();
-      break;
-
-    case "others":
-      renderOthers();
-      break;
-
-    case "news":
-      renderNews();
-      break;
-
-    case "table":
-      renderTable();
-      break;
-
-    case "players":
-      renderPlayers();
-      break;
-
-    case "selections":
-      renderSelections();
-      break;
-
-    case "teams":
-      renderTeams();
-      break;
-
-    case "admin":
-
-      if (isAdmin) {
-        renderAdmin();
-      } else {
-        showLogin();
-        renderHome();
-      }
-
-      break;
-
-    default:
-      renderHome();
-  }
-}
-
-
-/* =========================
-   HOME
-========================= */
-
-function renderHome() {
-
-  const latestNews =
-    [...data.news]
-      .sort(
-        (a, b) =>
-          Number(b.createdAt || 0) -
-          Number(a.createdAt || 0)
-      )
-      .slice(0, 3);
-
-  content.innerHTML = `
-    <section class="hero">
-
-      <img
-        src="/images/banner.png"
-        class="hero-banner"
-        alt="UTL Banner"
-        onerror="this.style.display='none'"
-      >
-
-      <div class="hero-content">
-
-        <img
-          src="/images/logo.png"
-          class="hero-logo"
-          alt="UTL"
-          onerror="this.style.display='none'"
-        >
-
-        <div>
-
-          <h1>
-            ULTIMATE TCS LEAGUE
-          </h1>
-
-          <p>
-            A maior competição da UTL.
-          </p>
-
-        </div>
-
-      </div>
-
-    </section>
-
-    <section class="stats-grid">
-
-      <div class="stat-card">
-        <strong>
-          ${data.players.length}
-        </strong>
-        <span>Jogadores</span>
-      </div>
-
-      <div class="stat-card">
-        <strong>
-          ${data.teams.length}
-        </strong>
-        <span>Times</span>
-      </div>
-
-      <div class="stat-card">
-        <strong>
-          ${data.selections.length}
-        </strong>
-        <span>Seleções</span>
-      </div>
-
-      <div class="stat-card">
-        <strong>
-          ${data.news.length}
-        </strong>
-        <span>Notícias</span>
-      </div>
-
-    </section>
-
-    <section class="section">
-
-      <div class="section-title">
-
-        <h2>
-          Últimas notícias
-        </h2>
-
-        <button
-          class="secondary-button"
-          data-page="news"
-        >
-          Ver todas
-        </button>
-
-      </div>
-
-      ${
-        latestNews.length
-          ? `
-            <div class="news-grid">
-              ${latestNews
-                .map(newsCard)
-                .join("")}
-            </div>
-          `
-          : `
-            <div class="card empty">
-              <p>
-                Nenhuma notícia
-                publicada ainda.
-              </p>
-            </div>
-          `
-      }
-
-    </section>
-  `;
-}
-
-
-/* =========================
-   OTHERS
-========================= */
-
-function renderOthers() {
-
-  const discord =
-    data.links?.discord || "";
-
-  const tiktok =
-    data.links?.tiktok || "";
-
-  content.innerHTML = `
-    <div class="page-header">
-
-      <h2>Others</h2>
-
-      <p>
-        Links oficiais da
-        ULTIMATE TCS LEAGUE.
-      </p>
-
-    </div>
-
-    <div class="cards-grid">
-
-      ${
-        discord
-          ? `
-            <a
-              class="link-card"
-              href="${escapeHTML(discord)}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-
-              <div class="link-icon">
-                💬
-              </div>
-
-              <div>
-
-                <h3>Discord</h3>
-
-                <p>
-                  Entre no servidor
-                  oficial da UTL.
-                </p>
-
-              </div>
-
-            </a>
-          `
-          : ""
-      }
-
-      ${
-        tiktok
-          ? `
-            <a
-              class="link-card"
-              href="${escapeHTML(tiktok)}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-
-              <div class="link-icon">
-                🎵
-              </div>
-
-              <div>
-
-                <h3>TikTok</h3>
-
-                <p>
-                  Acompanhe a UTL
-                  no TikTok.
-                </p>
-
-              </div>
-
-            </a>
-          `
-          : ""
-      }
-
-      ${
-        !discord && !tiktok
-          ? `
-            <div class="card empty">
-
-              <p>
-                Nenhum link foi
-                configurado.
-              </p>
-
-            </div>
-          `
-          : ""
-      }
-
-    </div>
-  `;
+  bindPageEvents();
 }
 
 
 /* =========================
    NEWS
-========================= */
+   ========================= */
+
+function renderNews() {
+
+  const categories =
+    Array.isArray(DATA.newsCategories) &&
+    DATA.newsCategories.length
+      ? DATA.newsCategories
+      : ["Geral"];
+
+
+  return `
+    <div class="page-header">
+      <h2>News</h2>
+
+      <p>
+        Notícias e atualizações
+        da ULTIMATE TCS LEAGUE.
+      </p>
+    </div>
+
+    <div class="news-categories">
+
+      ${categories
+        .map(category =>
+          renderNewsCategory(category)
+        )
+        .join("")}
+
+    </div>
+  `;
+}
+
+
+function renderNewsCategory(category) {
+
+  const news =
+    DATA.news.filter(
+      item =>
+        String(
+          item.category || "Geral"
+        ) === String(category)
+    );
+
+
+  const isOpen =
+    openNewsCategories.has(category);
+
+
+  return `
+    <section class="news-category">
+
+      <button
+        class="news-category-header"
+        data-news-toggle="${escapeHTML(category)}"
+      >
+
+        <span>
+          ${escapeHTML(category)}
+
+          <small>
+            ${news.length}
+            ${
+              news.length === 1
+                ? "notícia"
+                : "notícias"
+            }
+          </small>
+        </span>
+
+        <span class="news-category-arrow">
+          ${isOpen ? "⌄" : "⌃"}
+        </span>
+
+      </button>
+
+
+      <div
+        class="news-category-content"
+        ${isOpen ? "" : "hidden"}
+      >
+
+        ${
+          news.length
+
+            ? `
+              <div class="news-grid">
+
+                ${news
+                  .map(newsCard)
+                  .join("")}
+
+              </div>
+            `
+
+            : `
+              <div class="player-empty">
+                Nenhuma notícia nesta categoria.
+              </div>
+            `
+        }
+
+      </div>
+
+    </section>
+  `;
+}
+
 
 function newsCard(news) {
-
-  const category =
-    data.categories.find(
-      cat =>
-        String(cat.id) ===
-        String(news.categoryId)
-    );
 
   return `
     <article class="news-card">
 
       ${
         news.image
+
           ? `
             <img
               src="${escapeHTML(news.image)}"
-              alt="${escapeHTML(news.title)}"
+              alt=""
+              loading="lazy"
             >
           `
+
           : `
-            <div class="news-placeholder">
+            <div
+              class="news-image-placeholder"
+              style="
+                height:190px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                background:#181818;
+                color:#555;
+                font-size:40px;
+                font-weight:900;
+              "
+            >
               UTL
             </div>
           `
       }
 
-      <div class="news-card-body">
 
-        ${
-          category
-            ? `
-              <span class="category-tag">
-                ${escapeHTML(
-                  category.name
-                )}
-              </span>
-            `
-            : ""
-        }
+      <div class="news-card-content">
+
+        <span class="news-card-category">
+          ${escapeHTML(
+            news.category || "Geral"
+          )}
+        </span>
 
         <h3>
           ${escapeHTML(news.title)}
         </h3>
 
         <p>
-          ${escapeHTML(
-            news.description
-          )}
+          ${escapeHTML(news.description)}
         </p>
 
-        ${
-          isAdmin
-            ? `
-              <button
-                class="danger-button small"
-                data-delete-news="${escapeHTML(
-                  news.id
-                )}"
+      </div>
+
+    </article>
+  `;
+}
+
+
+/* =========================
+   TABELA
+   ========================= */
+
+function renderTable() {
+
+  return `
+    <div class="page-header">
+      <h2>Tabela</h2>
+
+      <p>
+        Tabela oficial da competição.
+      </p>
+    </div>
+
+    <div class="table-container">
+
+      ${
+        DATA.links &&
+        DATA.links.tabela
+
+          ? `
+            <div style="padding:20px">
+
+              <a
+                class="primary-button"
+                href="${escapeHTML(DATA.links.tabela)}"
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                Excluir
-              </button>
+                Abrir tabela
+              </a>
+
+            </div>
+          `
+
+          : `
+            <div
+              class="player-empty"
+              style="min-width:0"
+            >
+              O link da tabela ainda
+              não foi configurado.
+            </div>
+          `
+      }
+
+    </div>
+  `;
+}
+
+
+/* =========================
+   JOGADORES
+   ========================= */
+
+function sortPlayers(players) {
+
+  return [...players].sort(
+    (a, b) => {
+
+      const classA =
+        CLASS_ORDER.indexOf(
+          playerClass(a)
+        );
+
+      const classB =
+        CLASS_ORDER.indexOf(
+          playerClass(b)
+        );
+
+
+      if (classA !== classB) {
+        return classA - classB;
+      }
+
+
+      return (
+        (Number(a.order) || 0) -
+        (Number(b.order) || 0)
+      );
+
+    }
+  );
+
+}
+
+
+function renderPlayers() {
+
+  const groups = {};
+
+  CLASS_GROUPS.forEach(
+    group => {
+      groups[group] = [];
+    }
+  );
+
+
+  sortPlayers(DATA.players)
+    .forEach(player => {
+
+      const group =
+        getBaseClass(
+          playerClass(player)
+        );
+
+      if (!groups[group]) {
+        groups[group] = [];
+      }
+
+      groups[group].push(player);
+
+    });
+
+
+  return `
+    <div class="page-header">
+
+      <h2>Jogadores</h2>
+
+      <p>
+        Jogadores separados por classe.
+      </p>
+
+    </div>
+
+
+    <div class="players-container">
+
+      ${CLASS_GROUPS
+        .map(group =>
+          renderPlayerCategory(
+            group,
+            groups[group]
+          )
+        )
+        .join("")}
+
+    </div>
+  `;
+}
+
+
+function renderPlayerCategory(
+  group,
+  players
+) {
+
+  const isOpen =
+    openClasses.has(group);
+
+
+  return `
+    <section class="player-class-section">
+
+      <button
+        class="player-class-header"
+        data-toggle-class="${group}"
+      >
+
+        <span>
+          CLASS ${group}
+
+          <small>
+            ${players.length}
+            ${
+              players.length === 1
+                ? "jogador"
+                : "jogadores"
+            }
+          </small>
+        </span>
+
+
+        <span class="class-arrow">
+          ${isOpen ? "⌄" : "⌃"}
+        </span>
+
+      </button>
+
+
+      <div
+        class="player-class-content"
+        ${isOpen ? "" : "hidden"}
+      >
+
+        <div class="players-table-head">
+
+          <span>ID</span>
+
+          <span>NICK</span>
+
+          <span>CLASS</span>
+
+          <span>TEAM</span>
+
+          <span>ROLE</span>
+
+          <span>OVERALL</span>
+
+          <span>WAGE</span>
+
+        </div>
+
+
+        ${
+          players.length
+
+            ? players
+                .map(renderPlayerRow)
+                .join("")
+
+            : `
+              <div class="player-empty">
+                Nenhum jogador nessa classe.
+              </div>
             `
+        }
+
+      </div>
+
+    </section>
+  `;
+}
+
+
+function renderPlayerRow(player) {
+
+  const team =
+    getTeam(player);
+
+  const playerClassValue =
+    playerClass(player);
+
+  const cssClass =
+    getClassCSS(
+      playerClassValue
+    );
+
+
+  let teamHTML = "";
+
+
+  if (team) {
+
+    teamHTML = `
+      <span class="team-cell">
+
+        ${
+          team.logo
+
+            ? `
+              <img
+                class="team-shield"
+                src="${escapeHTML(team.logo)}"
+                alt=""
+              >
+            `
+
             : ""
+        }
+
+        <span>
+          ${escapeHTML(team.name)}
+        </span>
+
+      </span>
+    `;
+
+  }
+
+  else {
+
+    teamHTML = `
+      <span class="free-agent">
+        🏷️ FREE AGENT
+      </span>
+    `;
+
+  }
+
+
+  return `
+    <div class="player-row">
+
+      <span class="player-id">
+        ${escapeHTML(
+          player.id || "—"
+        )}
+      </span>
+
+
+      <span class="player-nick">
+        ${escapeHTML(
+          playerNick(player)
+        )}
+      </span>
+
+
+      <span>
+        <b class="
+          class-badge
+          class-${cssClass}
+        ">
+          ${escapeHTML(
+            playerClassValue
+          )}
+        </b>
+      </span>
+
+
+      <span>
+        ${teamHTML}
+      </span>
+
+
+      <span class="player-role">
+        ${escapeHTML(
+          playerRole(player)
+        )}
+      </span>
+
+
+      <span class="player-overall">
+        ${escapeHTML(
+          playerOverall(player)
+        )}
+      </span>
+
+
+      <span class="player-wage">
+        ${escapeHTML(
+          playerWage(player)
+        )}
+      </span>
+
+    </div>
+  `;
+}
+
+
+/* =========================
+   TIMES / SELEÇÕES
+   ========================= */
+
+function getClubPlayers(
+  club,
+  type
+) {
+
+  if (type === "team") {
+
+    return DATA.players.filter(
+      player =>
+        String(
+          getPlayerTeamId(player)
+        ) === String(club.id)
+    );
+
+  }
+
+
+  const ids =
+    Array.isArray(club.players)
+      ? club.players
+      : [];
+
+
+  return ids
+    .map(id =>
+      DATA.players.find(
+        player =>
+          String(player.id) === String(id)
+      )
+    )
+    .filter(Boolean);
+}
+
+
+function renderClubs(type) {
+
+  const clubs =
+    type === "team"
+      ? DATA.teams
+      : DATA.selections;
+
+  const title =
+    type === "team"
+      ? "Times"
+      : "Seleções";
+
+
+  const subtitle =
+    type === "team"
+      ? "Times da ULTIMATE TCS LEAGUE."
+      : "Seleções cadastradas na liga.";
+
+
+  return `
+    <div class="page-header">
+
+      <h2>${title}</h2>
+
+      <p>
+        ${subtitle}
+        Máximo de 16 jogadores.
+      </p>
+
+    </div>
+
+
+    ${
+      clubs.length
+
+        ? `
+          <div class="club-grid">
+
+            ${clubs
+              .map(club =>
+                renderClubCard(
+                  club,
+                  type
+                )
+              )
+              .join("")}
+
+          </div>
+        `
+
+        : `
+          <div class="card">
+            <p class="muted">
+              Nenhum ${
+                type === "team"
+                  ? "time"
+                  : "seleção"
+              } cadastrado.
+            </p>
+          </div>
+        `
+    }
+  `;
+}
+
+
+function renderClubCard(
+  club,
+  type
+) {
+
+  const players =
+    getClubPlayers(
+      club,
+      type
+    );
+
+
+  return `
+    <article
+      class="club-card"
+      style="
+        --club-bg:
+        ${escapeHTML(
+          club.color || "#15151b"
+        )};
+        background:
+        var(--club-bg);
+      "
+    >
+
+      <div class="club-top">
+
+        ${
+          club.logo
+
+            ? `
+              <img
+                src="${escapeHTML(club.logo)}"
+                class="club-logo"
+                alt=""
+              >
+            `
+
+            : `
+              <div class="club-logo placeholder">
+                ${
+                  type === "team"
+                    ? "⚽"
+                    : "🌎"
+                }
+              </div>
+            `
+        }
+
+
+        <div class="club-title">
+
+          <h3>
+            ${escapeHTML(club.name)}
+          </h3>
+
+
+          ${
+            club.link
+
+              ? `
+                <a
+                  href="${escapeHTML(club.link)}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Abrir link
+                </a>
+              `
+
+              : ""
+          }
+
+        </div>
+
+      </div>
+
+
+      <div class="club-roster-head">
+
+        <span>
+          JOGADORES
+        </span>
+
+        <b>
+          ${players.length}/16
+        </b>
+
+      </div>
+
+
+      <div class="club-roster">
+
+        ${
+          players.length
+
+            ? players
+                .map(player => `
+                  <div class="club-player">
+
+                    <span>
+                      ${escapeHTML(
+                        playerNick(player)
+                      )}
+                    </span>
+
+                    <b class="
+                      mini-class
+                      class-${getClassCSS(
+                        playerClass(player)
+                      )}
+                    ">
+                      ${escapeHTML(
+                        playerClass(player)
+                      )}
+                    </b>
+
+                  </div>
+                `)
+                .join("")
+
+            : `
+              <span class="muted">
+                Nenhum jogador.
+              </span>
+            `
         }
 
       </div>
@@ -713,1220 +1135,297 @@ function newsCard(news) {
   `;
 }
 
-function renderNews() {
-
-  const categories =
-    data.categories || [];
-
-  content.innerHTML = `
-    <div class="page-header">
-
-      <h2>Notícias</h2>
-
-      <p>
-        Confira as novidades da
-        ULTIMATE TCS LEAGUE.
-      </p>
-
-    </div>
-
-    ${
-      categories.length
-        ? `
-          <div class="category-filter">
-
-            <button
-              class="category-button active"
-              data-news-category="all"
-            >
-              Todas
-            </button>
-
-            ${categories
-              .map(
-                category => `
-                  <button
-                    class="category-button"
-                    data-news-category="${escapeHTML(
-                      category.id
-                    )}"
-                  >
-                    ${escapeHTML(
-                      category.name
-                    )}
-                  </button>
-                `
-              )
-              .join("")}
-
-          </div>
-        `
-        : ""
-    }
-
-    <div
-      id="news-list"
-      class="news-grid"
-    >
-
-      ${
-        data.news.length
-          ? data.news
-              .map(newsCard)
-              .join("")
-          : `
-            <div class="card empty">
-              <p>
-                Nenhuma notícia
-                publicada.
-              </p>
-            </div>
-          `
-      }
-
-    </div>
-  `;
-}
-
-function filterNews(categoryId) {
-
-  const container =
-    document.getElementById(
-      "news-list"
-    );
-
-  if (!container) return;
-
-  const filtered =
-    categoryId === "all"
-      ? data.news
-      : data.news.filter(
-          news =>
-            String(
-              news.categoryId
-            ) ===
-            String(categoryId)
-        );
-
-  container.innerHTML =
-    filtered.length
-      ? filtered
-          .map(newsCard)
-          .join("")
-      : `
-        <div class="card empty">
-          <p>
-            Nenhuma notícia
-            nessa categoria.
-          </p>
-        </div>
-      `;
-
-  document
-    .querySelectorAll(
-      "[data-news-category]"
-    )
-    .forEach(button => {
-
-      button.classList.toggle(
-        "active",
-        button.dataset.newsCategory ===
-          categoryId
-      );
-
-    });
-}
-
-
-/* =========================
-   TABELA
-========================= */
-
-function renderTable() {
-
-  content.innerHTML = `
-    <div class="page-header">
-
-      <h2>Tabela</h2>
-
-      <p>
-        Classificação oficial
-        da competição.
-      </p>
-
-    </div>
-
-    ${
-      data.tableUrl
-        ? `
-          <div class="table-frame-card">
-
-            <a
-              class="primary-button"
-              href="${escapeHTML(
-                data.tableUrl
-              )}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Abrir tabela
-            </a>
-
-            <div
-              class="table-iframe-wrapper"
-            >
-
-              <iframe
-                src="${escapeHTML(
-                  data.tableUrl
-                )}"
-                title="Tabela UTL"
-                loading="lazy"
-              ></iframe>
-
-            </div>
-
-          </div>
-        `
-        : `
-          <div class="card empty">
-
-            <h3>
-              Tabela ainda não
-              configurada
-            </h3>
-
-            <p>
-              O administrador ainda
-              não adicionou o link.
-            </p>
-
-          </div>
-        `
-    }
-  `;
-}
-
-
-/* =========================
-   PLAYERS
-========================= */
-
-function renderPlayers() {
-
-  content.innerHTML = `
-    <div class="page-header">
-
-      <h2>Jogadores</h2>
-
-      <p>
-        Confira os jogadores
-        separados por classe.
-      </p>
-
-    </div>
-
-    <div class="players-container">
-
-      ${classGroups
-        .map(renderPlayerGroup)
-        .join("")}
-
-    </div>
-  `;
-}
-
-function renderPlayerGroup(group) {
-
-  const players =
-    data.players
-      .filter(
-        player =>
-          getBaseClass(
-            player.class
-          ) === group
-      )
-      .sort((a, b) => {
-
-        const ai =
-          classOrder.indexOf(
-            a.class
-          );
-
-        const bi =
-          classOrder.indexOf(
-            b.class
-          );
-
-        if (ai !== bi) {
-          return ai - bi;
-        }
-
-        return (
-          Number(a.order || 0) -
-          Number(b.order || 0)
-        );
-
-      });
-
-  return `
-    <section
-      class="player-class-section"
-      data-class-group="${group}"
-    >
-
-      <button
-        class="player-class-header"
-        data-toggle-class="${group}"
-      >
-
-        <span>
-
-          CLASS ${group}
-
-          <small>
-            ${players.length}
-            jogador${players.length === 1
-              ? ""
-              : "es"}
-          </small>
-
-        </span>
-
-        <span class="class-arrow">
-          ^
-        </span>
-
-      </button>
-
-      <div
-        class="player-class-content"
-        data-class-content="${group}"
-        style="display:none"
-      >
-
-        <div class="players-table-head">
-
-          <span>ID</span>
-          <span>NICK</span>
-          <span>CLASS</span>
-          <span>TEAM</span>
-          <span>ROLE</span>
-          <span>WAGE</span>
-
-          ${
-            isAdmin
-              ? "<span>ORDEM</span>"
-              : ""
-          }
-
-        </div>
-
-        ${
-          players.length
-            ? players
-                .map(renderPlayerRow)
-                .join("")
-            : `
-              <div class="player-empty">
-                Nenhum jogador
-                nessa classe.
-              </div>
-            `
-        }
-
-      </div>
-
-    </section>
-  `;
-}
-
-function renderPlayerRow(player) {
-
-  const team =
-    getTeam(player);
-
-  const playerClass =
-    player.class || "D";
-
-  const baseClass =
-    getBaseClass(
-      playerClass
-    ).toLowerCase();
-
-  const role =
-    player.role || "PLAYER";
-
-  let teamHTML = "";
-
-  if (!team) {
-
-    teamHTML = `
-      <span class="free-agent">
-        🏷️ FREE AGENT
-      </span>
-    `;
-
-  } else {
-
-    teamHTML = `
-      <span class="team-cell">
-
-        ${
-          team.logo
-            ? `
-              <img
-                src="${escapeHTML(
-                  team.logo
-                )}"
-                class="team-shield"
-                alt=""
-              >
-            `
-            : ""
-        }
-
-        <span>
-          ${escapeHTML(
-            team.name
-          )}
-        </span>
-
-      </span>
-    `;
-  }
-
-  return `
-    <div
-      class="player-row"
-      data-player-id="${escapeHTML(
-        player.id
-      )}"
-      data-player-class="${escapeHTML(
-        playerClass
-      )}"
-    >
-
-      <span class="player-id">
-        ${escapeHTML(
-          player.id || "—"
-        )}
-      </span>
-
-      <span class="player-nick">
-        ${escapeHTML(
-          player.nick ||
-          player.name ||
-          "Sem nome"
-        )}
-      </span>
-
-      <span>
-
-        <span
-          class="class-badge class-${baseClass}"
-        >
-          ${escapeHTML(
-            playerClass
-          )}
-        </span>
-
-      </span>
-
-      <span>
-        ${teamHTML}
-      </span>
-
-      <span class="player-role">
-        ${escapeHTML(role)}
-      </span>
-
-      <span class="player-wage">
-        ${escapeHTML(
-          getPlayerWage(player)
-        )}
-      </span>
-
-      ${
-        isAdmin
-          ? `
-            <span class="player-order-actions">
-
-              <button
-                type="button"
-                class="player-move-button"
-                data-move-player="up"
-                data-player-id="${escapeHTML(
-                  player.id
-                )}"
-                title="Subir"
-              >
-                ↑
-              </button>
-
-              <button
-                type="button"
-                class="player-move-button"
-                data-move-player="down"
-                data-player-id="${escapeHTML(
-                  player.id
-                )}"
-                title="Descer"
-              >
-                ↓
-              </button>
-
-            </span>
-          `
-          : ""
-      }
-
-    </div>
-  `;
-}
-function togglePlayerGroup(group) {
-
-  const container =
-    document.querySelector(
-      `[data-class-content="${group}"]`
-    );
-
-  const button =
-    document.querySelector(
-      `[data-toggle-class="${group}"]`
-    );
-
-  if (!container || !button) return;
-
-  const arrow =
-    button.querySelector(".class-arrow");
-
-  const isClosed =
-    container.style.display === "none" ||
-    container.style.display === "";
-
-  container.style.display =
-    isClosed ? "block" : "none";
-
-  if (arrow) {
-    arrow.textContent =
-      isClosed ? "v" : "^";
-  }
-}
-
-
-/* =========================
-   MOVER JOGADOR — ADMIN
-========================= */
-
-async function movePlayer(id, direction) {
-
-  if (!isAdmin) return;
-
-  const player =
-    data.players.find(
-      p => String(p.id) === String(id)
-    );
-
-  if (!player) return;
-
-  const group =
-    getBaseClass(
-      player.class || "D"
-    );
-
-  const players =
-    data.players
-      .filter(
-        p =>
-          getBaseClass(
-            p.class || "D"
-          ) === group
-      )
-      .sort((a, b) => {
-
-        const ai =
-          classOrder.indexOf(
-            a.class || "D"
-          );
-
-        const bi =
-          classOrder.indexOf(
-            b.class || "D"
-          );
-
-        if (ai !== bi) {
-          return ai - bi;
-        }
-
-        return (
-          Number(a.order || 0) -
-          Number(b.order || 0)
-        );
-      });
-
-  const index =
-    players.findIndex(
-      p => String(p.id) === String(id)
-    );
-
-  if (index === -1) return;
-
-  const targetIndex =
-    direction === "up"
-      ? index - 1
-      : index + 1;
-
-  if (
-    targetIndex < 0 ||
-    targetIndex >= players.length
-  ) {
-    return;
-  }
-
-  [
-    players[index],
-    players[targetIndex]
-  ] = [
-    players[targetIndex],
-    players[index]
-  ];
-
-  const order =
-    players.map((p, i) => ({
-      id: p.id,
-      order: i
-    }));
-
-  try {
-
-    const response =
-      await api(
-        "/api/admin/players/reorder",
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            order
-          })
-        }
-      );
-
-    if (!response.ok) {
-
-      alert(
-        "Erro ao mudar a posição do jogador."
-      );
-
-      return;
-    }
-
-    await loadData();
-
-    renderPlayers();
-
-  } catch (error) {
-
-    console.error(error);
-
-    alert(
-      "Erro ao mudar a posição do jogador."
-    );
-  }
-}
-
-
-/* =========================
-   SELECTIONS
-========================= */
-
-function renderSelections() {
-
-  content.innerHTML = `
-    <div class="page-header">
-
-      <h2>Seleções</h2>
-
-      <p>
-        Seleções cadastradas na UTL.
-      </p>
-
-    </div>
-
-    ${
-      data.selections.length
-        ? `
-          <div class="cards-grid">
-
-            ${data.selections
-              .map(
-                selection => `
-
-                  <article class="team-card">
-
-                    ${
-                      selection.logo
-                        ? `
-                          <img
-                            src="${escapeHTML(
-                              selection.logo
-                            )}"
-                            class="team-logo-large"
-                            alt=""
-                          >
-                        `
-                        : `
-                          <div
-                            class="team-logo-placeholder"
-                          >
-                            🌎
-                          </div>
-                        `
-                    }
-
-                    <h3>
-                      ${escapeHTML(
-                        selection.name
-                      )}
-                    </h3>
-
-                    <p>
-                      Seleção UTL
-                    </p>
-
-                  </article>
-
-                `
-              )
-              .join("")}
-
-          </div>
-        `
-        : `
-          <div class="card empty">
-
-            <p>
-              Nenhuma seleção
-              cadastrada.
-            </p>
-
-          </div>
-        `
-    }
-  `;
-}
-
-
-/* =========================
-   TEAMS
-========================= */
-
-function renderTeams() {
-
-  content.innerHTML = `
-    <div class="page-header">
-
-      <h2>Times</h2>
-
-      <p>
-        Times cadastrados na UTL.
-      </p>
-
-    </div>
-
-    ${
-      data.teams.length
-        ? `
-          <div class="cards-grid">
-
-            ${data.teams
-              .map(
-                team => `
-
-                  <article class="team-card">
-
-                    ${
-                      team.logo
-                        ? `
-                          <img
-                            src="${escapeHTML(
-                              team.logo
-                            )}"
-                            class="team-logo-large"
-                            alt=""
-                          >
-                        `
-                        : `
-                          <div
-                            class="team-logo-placeholder"
-                          >
-                            ⚽
-                          </div>
-                        `
-                    }
-
-                    <h3>
-                      ${escapeHTML(
-                        team.name
-                      )}
-                    </h3>
-
-                    <p>
-                      Time UTL
-                    </p>
-
-                  </article>
-
-                `
-              )
-              .join("")}
-
-          </div>
-        `
-        : `
-          <div class="card empty">
-
-            <p>
-              Nenhum time
-              cadastrado.
-            </p>
-
-          </div>
-        `
-    }
-  `;
-}
-
 
 /* =========================
    ADMIN
-========================= */
+   ========================= */
 
 function renderAdmin() {
 
-  if (!isAdmin) {
+  const teamOptions =
+    DATA.teams
+      .map(team => `
+        <option value="${escapeHTML(team.id)}">
+          ${escapeHTML(team.name)}
+        </option>
+      `)
+      .join("");
 
-    showLogin();
 
-    return;
-  }
+  const selectionPlayers =
+    DATA.players
+      .map(player => `
+        <label
+          class="check-player"
+          style="
+            display:flex;
+            gap:8px;
+            align-items:center;
+          "
+        >
 
-  content.innerHTML = `
+          <input
+            type="checkbox"
+            value="${escapeHTML(player.id)}"
+            data-selection-player
+          >
 
+          <span>
+            ${escapeHTML(
+              playerNick(player)
+            )}
+            —
+            ${escapeHTML(
+              playerClass(player)
+            )}
+          </span>
+
+        </label>
+      `)
+      .join("");
+
+
+  return `
     <div class="page-header">
 
-      <h2>
-        Área Administrativa
-      </h2>
+      <h2>Admin Area</h2>
 
       <p>
-        Gerencie o conteúdo
-        do site da UTL.
+        Organize o conteúdo da UTL.
       </p>
 
     </div>
 
 
-    <div class="admin-grid">
-
-      <section class="admin-card">
-
-        <h3>
-          Links
-        </h3>
-
-        <form id="links-form">
-
-          <label>
-            Discord
-          </label>
-
-          <input
-            id="link-discord"
-            type="url"
-            placeholder="https://discord.gg/..."
-            value="${escapeHTML(
-              data.links?.discord || ""
-            )}"
-          >
-
-          <label>
-            TikTok
-          </label>
-
-          <input
-            id="link-tiktok"
-            type="url"
-            placeholder="https://www.tiktok.com/..."
-            value="${escapeHTML(
-              data.links?.tiktok || ""
-            )}"
-          >
-
-          <button
-            class="primary-button"
-            type="submit"
-          >
-            Salvar links
-          </button>
-
-        </form>
-
-      </section>
-
-
-      <section class="admin-card">
-
-        <h3>
-          Tabela
-        </h3>
-
-        <form id="table-form">
-
-          <label>
-            URL da tabela
-          </label>
-
-          <input
-            id="table-url"
-            type="url"
-            placeholder="https://..."
-            value="${escapeHTML(
-              data.tableUrl || ""
-            )}"
-          >
-
-          <button
-            class="primary-button"
-            type="submit"
-          >
-            Salvar tabela
-          </button>
-
-        </form>
-
-      </section>
-
-
-      <section class="admin-card">
-
-        <h3>
-          Categorias de notícias
-        </h3>
-
-        <form id="category-form">
-
-          <label>
-            Nome da categoria
-          </label>
-
-          <input
-            id="category-name"
-            type="text"
-            placeholder="Ex: Brasileirão"
-            required
-          >
-
-          <button
-            class="primary-button"
-            type="submit"
-          >
-            Criar categoria
-          </button>
-
-        </form>
-
-        <div class="admin-list">
-
-          ${
-            data.categories.length
-              ? data.categories
-                  .map(
-                    category => `
-                      <div
-                        class="admin-list-item"
-                      >
-
-                        <span>
-                          ${escapeHTML(
-                            category.name
-                          )}
-                        </span>
-
-                        <button
-                          class="danger-button small"
-                          data-delete-category="${escapeHTML(
-                            category.id
-                          )}"
-                        >
-                          Excluir
-                        </button>
-
-                      </div>
-                    `
-                  )
-                  .join("")
-              : `
-                <p class="muted">
-                  Nenhuma categoria.
-                </p>
-              `
-          }
-
-        </div>
-
-      </section>
-
-
-      <section class="admin-card admin-wide">
-
-        <h3>
-          Adicionar notícia
-        </h3>
-
-        <form id="news-form">
-
-          <label>
-            Título
-          </label>
-
-          <input
-            id="news-title"
-            type="text"
-            required
-          >
-
-          <label>
-            Descrição
-          </label>
-
-          <textarea
-            id="news-description"
-            rows="5"
-            required
-          ></textarea>
-
-          <label>
-            Imagem
-          </label>
-
-          <input
-            id="news-image"
-            type="url"
-            placeholder="https://..."
-          >
-
-          <label>
-            Categoria
-          </label>
-
-          <select
-            id="news-category"
-          >
-
-            <option value="">
-              Sem categoria
-            </option>
-
-            ${data.categories
-              .map(
-                category => `
-                  <option
-                    value="${escapeHTML(
-                      category.id
-                    )}"
-                  >
-                    ${escapeHTML(
-                      category.name
-                    )}
-                  </option>
-                `
-              )
-              .join("")}
-
-          </select>
-
-          <button
-            class="primary-button"
-            type="submit"
-          >
-            Publicar notícia
-          </button>
-
-        </form>
-
-      </section>
-
-
-      <section class="admin-card admin-wide">
-
-        <h3>
-          Adicionar jogador
-        </h3>
-
-        <form id="player-form">
-
-          <label>
-            ID do jogador
-          </label>
-
-          <input
-            id="player-id"
-            type="text"
-            placeholder="Ex: 1234"
-            required
-          >
-
-          <label>
-            Nick
-          </label>
-
-          <input
-            id="player-nick"
-            type="text"
-            required
-          >
-
-          <label>
-            Classe
-          </label>
-
-          <select
-            id="player-class"
-            required
-          >
-
-            ${classOrder
-              .map(
-                playerClass => `
-                  <option
-                    value="${playerClass}"
-                  >
-                    ${playerClass}
-                    — ${wages[playerClass]}
-                  </option>
-                `
-              )
-              .join("")}
-
-          </select>
-
-          <label>
-            Time
-          </label>
-
-          <select id="player-team">
-
-            <option value="FREE AGENT">
-              🏷️ FREE AGENT
-            </option>
-
-            ${data.teams
-              .map(
-                team => `
-                  <option
-                    value="${escapeHTML(
-                      team.id
-                    )}"
-                  >
-                    ${escapeHTML(
-                      team.name
-                    )}
-                  </option>
-                `
-              )
-              .join("")}
-
-          </select>
-
-          <label>
-            Role
-          </label>
-
-          <select
-            id="player-role"
-            required
-          >
-
-            <option value="PLAYER">
-              PLAYER
-            </option>
-
-            <option value="ASSIST MANAGER">
-              ASSIST MANAGER
-            </option>
-
-            <option value="MANAGER">
-              MANAGER
-            </option>
-
-          </select>
-
-          <button
-            class="primary-button"
-            type="submit"
-          >
-            Adicionar jogador
-          </button>
-
-        </form>
-
-      </section>
-
-    </div>
-
-
-    <section class="admin-card admin-wide">
-
-      <div class="admin-section-header">
-
-        <div>
-
-          <h3>
-            Notícias publicadas
-          </h3>
-
-          <p>
-            Gerencie as notícias
-            existentes.
-          </p>
-
-        </div>
-
-      </div>
-
-      <div class="admin-list">
+    <!-- LINKS -->
+
+    <section class="admin-section">
+
+      <h3>Links</h3>
+
+      <form
+        id="links-form"
+        class="admin-form"
+      >
+
+        <input
+          id="discordLink"
+          placeholder="Link do Discord"
+          value="${escapeHTML(
+            DATA.links?.discord
+          )}"
+        >
+
+        <input
+          id="tiktokLink"
+          placeholder="Link do TikTok"
+          value="${escapeHTML(
+            DATA.links?.tiktok
+          )}"
+        >
+
+        <input
+          id="tableLink"
+          placeholder="Link da Tabela"
+          value="${escapeHTML(
+            DATA.links?.tabela
+          )}"
+        >
+
+        <button
+          type="submit"
+          class="primary-button"
+        >
+          Salvar links
+        </button>
+
+      </form>
+
+    </section>
+
+
+    <!-- CATEGORIAS NEWS -->
+
+    <section class="admin-section">
+
+      <h3>
+        Categorias de News
+      </h3>
+
+      <form
+        id="category-form"
+        class="admin-form"
+      >
+
+        <input
+          id="categoryName"
+          placeholder="Nome da categoria"
+        >
+
+        <button
+          type="submit"
+          class="primary-button"
+        >
+          Criar categoria
+        </button>
+
+      </form>
+
+
+      <div
+        class="admin-list"
+        style="margin-top:15px"
+      >
 
         ${
-          data.news.length
-            ? data.news
-                .map(
-                  news => `
-                    <div
-                      class="admin-list-item"
-                    >
+          (DATA.newsCategories || [])
+            .map(category => `
+              <div class="admin-list-item">
 
-                      <span>
-                        ${escapeHTML(
-                          news.title
-                        )}
-                      </span>
+                <span>
+                  ${escapeHTML(category)}
+                </span>
 
+                ${
+                  category !== "Geral"
+
+                    ? `
                       <button
-                        class="danger-button small"
-                        data-delete-news="${escapeHTML(
-                          news.id
-                        )}"
+                        class="danger-button"
+                        data-delete-category="${escapeHTML(category)}"
                       >
                         Excluir
                       </button>
+                    `
+
+                    : `
+                      <span
+                        class="muted"
+                        style="font-size:12px"
+                      >
+                        padrão
+                      </span>
+                    `
+                }
+
+              </div>
+            `)
+            .join("")
+        }
+
+      </div>
+
+    </section>
+
+
+    <!-- PUBLICAR NEWS -->
+
+    <section class="admin-section">
+
+      <h3>
+        Publicar notícia
+      </h3>
+
+      <form
+        id="news-form"
+        class="admin-form"
+      >
+
+        <input
+          id="newsTitle"
+          placeholder="Título"
+          required
+        >
+
+
+        <select id="newsCategory">
+
+          ${(DATA.newsCategories || ["Geral"])
+            .map(category => `
+              <option value="${escapeHTML(category)}">
+                ${escapeHTML(category)}
+              </option>
+            `)
+            .join("")}
+
+        </select>
+
+
+        <input
+          id="newsImage"
+          placeholder="URL da imagem"
+        >
+
+
+        <textarea
+          id="newsDescription"
+          placeholder="Descrição"
+          required
+        ></textarea>
+
+
+        <button
+          type="submit"
+          class="primary-button"
+        >
+          Publicar notícia
+        </button>
+
+      </form>
+
+
+      <div
+        class="admin-list"
+        style="margin-top:20px"
+      >
+
+        ${
+          DATA.news.length
+
+            ? DATA.news
+                .map(news => `
+                  <div
+                    class="admin-list-item"
+                  >
+
+                    <div>
+
+                      <strong>
+                        ${escapeHTML(
+                          news.title
+                        )}
+                      </strong>
+
+                      <div
+                        class="muted"
+                        style="
+                          margin-top:4px;
+                          font-size:12px;
+                        "
+                      >
+                        ${escapeHTML(
+                          news.category ||
+                          "Geral"
+                        )}
+                      </div>
 
                     </div>
-                  `
-                )
+
+
+                    <button
+                      class="danger-button"
+                      data-delete-news="${escapeHTML(news.id)}"
+                    >
+                      Excluir
+                    </button>
+
+                  </div>
+                `)
                 .join("")
+
             : `
               <p class="muted">
-                Nenhuma notícia.
+                Nenhuma notícia publicada.
               </p>
             `
         }
@@ -1936,186 +1435,407 @@ function renderAdmin() {
     </section>
 
 
-    <section class="admin-card admin-wide">
+    <!-- CRIAR TIME -->
 
-      <div class="admin-section-header">
+    <section class="admin-section">
 
-        <div>
+      <h3>
+        Criar time
+      </h3>
 
-          <h3>
-            Times
-          </h3>
-
-          <p>
-            Crie os times que
-            poderão ser atribuídos
-            aos jogadores.
-          </p>
-
-        </div>
-
-      </div>
-
-      <form id="team-form">
-
-        <label>
-          Nome do time
-        </label>
+      <form
+        id="team-form"
+        class="admin-form"
+      >
 
         <input
-          id="team-name"
-          type="text"
-          placeholder="Ex: Cruzeiro"
+          id="teamName"
+          placeholder="Nome do time"
           required
         >
 
+
         <label>
-          Logo do time
+          Cor do fundo
         </label>
 
         <input
-          id="team-logo"
-          type="url"
-          placeholder="https://..."
+          id="teamColor"
+          class="color-input"
+          type="color"
+          value="#15151b"
         >
 
+
+        <input
+          id="teamLogo"
+          placeholder="URL do escudo"
+        >
+
+
+        <input
+          id="teamLink"
+          placeholder="Link do time"
+        >
+
+
         <button
-          class="primary-button"
           type="submit"
+          class="primary-button"
         >
           Criar time
         </button>
 
       </form>
 
-      <div class="admin-list">
-
-        ${
-          data.teams.length
-            ? data.teams
-                .map(
-                  team => `
-                    <div
-                      class="admin-list-item"
-                    >
-
-                      <span>
-                        ${escapeHTML(
-                          team.name
-                        )}
-                      </span>
-
-                      <button
-                        class="danger-button small"
-                        data-delete-team="${escapeHTML(
-                          team.id
-                        )}"
-                      >
-                        Excluir
-                      </button>
-
-                    </div>
-                  `
-                )
-                .join("")
-            : `
-              <p class="muted">
-                Nenhum time.
-              </p>
-            `
-        }
-
-      </div>
-
     </section>
 
 
-    <section class="admin-card admin-wide">
+    <!-- CRIAR SELEÇÃO -->
 
-      <div class="admin-section-header">
+    <section class="admin-section">
 
-        <div>
+      <h3>
+        Criar seleção
+      </h3>
 
-          <h3>
-            Seleções
-          </h3>
-
-          <p>
-            Crie seleções e
-            adicione jogadores.
-          </p>
-
-        </div>
-
-      </div>
-
-      <form id="selection-form">
-
-        <label>
-          Nome da seleção
-        </label>
+      <form
+        id="selection-form"
+        class="admin-form"
+      >
 
         <input
-          id="selection-name"
-          type="text"
-          placeholder="Ex: Brasil"
+          id="selectionName"
+          placeholder="Nome da seleção"
           required
         >
 
+
         <label>
-          Logo da seleção
+          Cor do fundo
         </label>
 
         <input
-          id="selection-logo"
-          type="url"
-          placeholder="https://..."
+          id="selectionColor"
+          class="color-input"
+          type="color"
+          value="#15151b"
         >
 
+
+        <input
+          id="selectionLogo"
+          placeholder="URL do escudo"
+        >
+
+
+        <input
+          id="selectionLink"
+          placeholder="Link da seleção"
+        >
+
+
+        <div
+          class="selection-picker"
+          style="
+            margin-top:5px;
+          "
+        >
+
+          <strong>
+            Jogadores — máximo 16
+          </strong>
+
+
+          <div
+            class="check-grid"
+            style="
+              display:grid;
+              gap:8px;
+              margin-top:10px;
+            "
+          >
+
+            ${
+              selectionPlayers ||
+
+              `
+                <span class="muted">
+                  Cadastre jogadores primeiro.
+                </span>
+              `
+            }
+
+          </div>
+
+        </div>
+
+
         <button
-          class="primary-button"
           type="submit"
+          class="primary-button"
         >
           Criar seleção
         </button>
 
       </form>
 
+    </section>
+
+
+    <!-- ADICIONAR JOGADOR -->
+
+    <section class="admin-section">
+
+      <h3>
+        Adicionar jogador
+      </h3>
+
+      <form
+        id="player-form"
+        class="admin-form"
+      >
+
+        <input
+          id="playerId"
+          placeholder="ID do jogador"
+          required
+        >
+
+
+        <input
+          id="playerNick"
+          placeholder="Nick"
+          required
+        >
+
+
+        <select id="playerClass">
+
+          ${CLASS_ORDER
+            .map(className => `
+              <option value="${className}">
+                ${className}
+              </option>
+            `)
+            .join("")}
+
+        </select>
+
+
+        <input
+          id="playerOverall"
+          type="number"
+          min="0"
+          max="100"
+          placeholder="Overall (0–100)"
+        >
+
+
+        <select id="playerTeam">
+
+          <option value="FREE AGENT">
+            🏷️ FREE AGENT
+          </option>
+
+          ${teamOptions}
+
+        </select>
+
+
+        <select id="playerRole">
+
+          <option value="PLAYER">
+            PLAYER
+          </option>
+
+          <option value="ASSIST MANAGER">
+            ASSIST MANAGER
+          </option>
+
+          <option value="MANAGER">
+            MANAGER
+          </option>
+
+        </select>
+
+
+        <button
+          type="submit"
+          class="primary-button"
+        >
+          Adicionar jogador
+        </button>
+
+      </form>
+
+
+      <p
+        class="muted"
+        style="
+          margin-top:12px;
+          font-size:12px;
+        "
+      >
+        A ordem é automática:
+        + primeiro, normal depois
+        e - por último.
+      </p>
+
+    </section>
+
+
+    <!-- CONTEÚDO -->
+
+    <section class="admin-section">
+
+      <h3>
+        Conteúdo cadastrado
+      </h3>
+
+
       <div class="admin-list">
 
         ${
-          data.selections.length
-            ? data.selections
-                .map(
-                  selection => `
-                    <div
-                      class="admin-list-item"
-                    >
+          DATA.teams
+            .map(team => `
+              <div class="admin-list-item">
 
-                      <span>
-                        ${escapeHTML(
-                          selection.name
-                        )}
-                      </span>
+                <div>
 
-                      <button
-                        class="danger-button small"
-                        data-delete-selection="${escapeHTML(
-                          selection.id
-                        )}"
-                      >
-                        Excluir
-                      </button>
+                  <strong>
+                    TIME:
+                  </strong>
 
-                    </div>
-                  `
-                )
-                .join("")
-            : `
-              <p class="muted">
-                Nenhuma seleção.
-              </p>
-            `
+                  ${escapeHTML(team.name)}
+
+                  <span
+                    class="muted"
+                    style="
+                      margin-left:8px;
+                      font-size:12px;
+                    "
+                  >
+                    ${
+                      getClubPlayers(
+                        team,
+                        "team"
+                      ).length
+                    }/16
+                  </span>
+
+                </div>
+
+
+                <button
+                  class="danger-button"
+                  data-delete-team="${escapeHTML(team.id)}"
+                >
+                  Excluir
+                </button>
+
+              </div>
+            `)
+            .join("")
+        }
+
+
+        ${
+          DATA.selections
+            .map(selection => `
+              <div class="admin-list-item">
+
+                <div>
+
+                  <strong>
+                    SELEÇÃO:
+                  </strong>
+
+                  ${escapeHTML(
+                    selection.name
+                  )}
+
+                  <span
+                    class="muted"
+                    style="
+                      margin-left:8px;
+                      font-size:12px;
+                    "
+                  >
+                    ${
+                      getClubPlayers(
+                        selection,
+                        "selection"
+                      ).length
+                    }/16
+                  </span>
+
+                </div>
+
+
+                <button
+                  class="danger-button"
+                  data-delete-selection="${escapeHTML(selection.id)}"
+                >
+                  Excluir
+                </button>
+
+              </div>
+            `)
+            .join("")
+        }
+
+
+        ${
+          DATA.players
+            .map(player => `
+              <div class="admin-list-item">
+
+                <div>
+
+                  <strong>
+                    ${escapeHTML(
+                      playerNick(player)
+                    )}
+                  </strong>
+
+                  <div
+                    class="muted"
+                    style="
+                      margin-top:4px;
+                      font-size:12px;
+                    "
+                  >
+                    ID:
+                    ${escapeHTML(player.id)}
+                    ·
+                    ${escapeHTML(
+                      playerClass(player)
+                    )}
+                    ·
+                    OVR:
+                    ${escapeHTML(
+                      playerOverall(player)
+                    )}
+                    ·
+                    ${escapeHTML(
+                      playerRole(player)
+                    )}
+                  </div>
+
+                </div>
+
+
+                <button
+                  class="danger-button"
+                  data-delete-player="${escapeHTML(player.id)}"
+                >
+                  Excluir
+                </button>
+
+              </div>
+            `)
+            .join("")
         }
 
       </div>
@@ -2123,903 +1843,1039 @@ function renderAdmin() {
     </section>
 
 
-    <section class="admin-card admin-wide">
+    <!-- SAIR -->
 
-      <div class="admin-section-header">
-
-        <div>
-
-          <h3>
-            Jogadores cadastrados
-          </h3>
-
-          <p>
-            Lista completa dos
-            jogadores cadastrados.
-          </p>
-
-        </div>
-
-      </div>
-
-      <div class="admin-list">
-
-        ${
-          data.players.length
-            ? data.players
-                .map(
-                  player => `
-                    <div
-                      class="admin-list-item"
-                    >
-
-                      <span>
-
-                        <strong>
-                          ${escapeHTML(
-                            player.id || "—"
-                          )}
-                        </strong>
-
-                        —
-                        ${escapeHTML(
-                          player.nick ||
-                          player.name ||
-                          "Sem nome"
-                        )}
-
-                        —
-                        ${escapeHTML(
-                          player.class ||
-                          "D"
-                        )}
-
-                        —
-                        ${escapeHTML(
-                          player.role ||
-                          "PLAYER"
-                        )}
-
-                      </span>
-
-                      <button
-                        class="danger-button small"
-                        data-delete-player="${escapeHTML(
-                          player.id
-                        )}"
-                      >
-                        Excluir
-                      </button>
-
-                    </div>
-                  `
-                )
-                .join("")
-            : `
-              <p class="muted">
-                Nenhum jogador.
-              </p>
-            `
-        }
-
-      </div>
-
-    </section>
-
-
-    <section class="admin-card admin-wide">
+    <section class="admin-section">
 
       <button
+        id="logout-button"
         class="danger-button"
-        data-logout
       >
-        Sair da área administrativa
+        Sair da conta
       </button>
 
     </section>
 
   `;
 }
-async function saveLinks(event) {
-
-  event.preventDefault();
-
-  const discord =
-    document
-      .getElementById("link-discord")
-      ?.value
-      .trim() || "";
-
-  const tiktok =
-    document
-      .getElementById("link-tiktok")
-      ?.value
-      .trim() || "";
-
-  const response =
-    await api(
-      "/api/admin/links",
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          discord,
-          tiktok
-        })
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao salvar os links."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function saveTable(event) {
-
-  event.preventDefault();
-
-  const tableUrl =
-    document
-      .getElementById("table-url")
-      ?.value
-      .trim() || "";
-
-  const response =
-    await api(
-      "/api/admin/table",
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          tableUrl
-        })
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao salvar a tabela."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function createCategory(event) {
-
-  event.preventDefault();
-
-  const name =
-    document
-      .getElementById("category-name")
-      ?.value
-      .trim() || "";
-
-  if (!name) return;
-
-  const response =
-    await api(
-      "/api/admin/categories",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name
-        })
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao criar categoria."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function deleteCategory(id) {
-
-  if (
-    !confirm(
-      "Excluir esta categoria?"
-    )
-  ) {
-    return;
-  }
-
-  const response =
-    await api(
-      `/api/admin/categories/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao excluir categoria."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function createNews(event) {
-
-  event.preventDefault();
-
-  const title =
-    document
-      .getElementById("news-title")
-      ?.value
-      .trim() || "";
-
-  const description =
-    document
-      .getElementById("news-description")
-      ?.value
-      .trim() || "";
-
-  const image =
-    document
-      .getElementById("news-image")
-      ?.value
-      .trim() || "";
-
-  const categoryId =
-    document
-      .getElementById("news-category")
-      ?.value || "";
-
-  if (!title || !description) {
-    return;
-  }
-
-  const response =
-    await api(
-      "/api/admin/news",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          title,
-          description,
-          image,
-          categoryId
-        })
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao publicar notícia."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function deleteNews(id) {
-
-  if (
-    !confirm(
-      "Excluir esta notícia?"
-    )
-  ) {
-    return;
-  }
-
-  const response =
-    await api(
-      `/api/admin/news/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao excluir notícia."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function createPlayer(event) {
-
-  event.preventDefault();
-
-  const playerId =
-    document
-      .getElementById("player-id")
-      ?.value
-      .trim() || "";
-
-  const nick =
-    document
-      .getElementById("player-nick")
-      ?.value
-      .trim() || "";
-
-  const playerClass =
-    document
-      .getElementById("player-class")
-      ?.value || "D";
-
-  const teamId =
-    document
-      .getElementById("player-team")
-      ?.value ||
-      "FREE AGENT";
-
-  const role =
-    document
-      .getElementById("player-role")
-      ?.value ||
-      "PLAYER";
-
-  if (!playerId || !nick) {
-
-    alert(
-      "Preencha o ID e o Nick."
-    );
-
-    return;
-  }
-
-  const response =
-    await api(
-      "/api/admin/players",
-      {
-        method: "POST",
-
-        body: JSON.stringify({
-          id: playerId,
-          nick,
-          class: playerClass,
-          teamId,
-          role,
-          freeAgent:
-            teamId === "FREE AGENT"
-        })
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao adicionar jogador."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function deletePlayer(id) {
-
-  if (
-    !confirm(
-      "Excluir este jogador?"
-    )
-  ) {
-    return;
-  }
-
-  const response =
-    await api(
-      `/api/admin/players/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao excluir jogador."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function createTeam(event) {
-
-  event.preventDefault();
-
-  const name =
-    document
-      .getElementById("team-name")
-      ?.value
-      .trim() || "";
-
-  const logo =
-    document
-      .getElementById("team-logo")
-      ?.value
-      .trim() || "";
-
-  if (!name) return;
-
-  const response =
-    await api(
-      "/api/admin/teams",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          logo
-        })
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao criar time."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function deleteTeam(id) {
-
-  if (
-    !confirm(
-      "Excluir este time?"
-    )
-  ) {
-    return;
-  }
-
-  const response =
-    await api(
-      `/api/admin/teams/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao excluir time."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function createSelection(event) {
-
-  event.preventDefault();
-
-  const name =
-    document
-      .getElementById("selection-name")
-      ?.value
-      .trim() || "";
-
-  const logo =
-    document
-      .getElementById("selection-logo")
-      ?.value
-      .trim() || "";
-
-  if (!name) return;
-
-  const response =
-    await api(
-      "/api/admin/selections",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          logo
-        })
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao criar seleção."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-async function deleteSelection(id) {
-
-  if (
-    !confirm(
-      "Excluir esta seleção?"
-    )
-  ) {
-    return;
-  }
-
-  const response =
-    await api(
-      `/api/admin/selections/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-  if (!response.ok) {
-
-    alert(
-      "Erro ao excluir seleção."
-    );
-
-    return;
-  }
-
-  await loadData();
-
-  renderAdmin();
-}
-
-
-/* =========================
-   EVENTOS
-========================= */
-
-document.addEventListener(
-  "click",
-  async event => {
-
-    const moveButton =
-      event.target.closest(
-        "[data-move-player]"
-      );
-
-    if (moveButton) {
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      await movePlayer(
-        moveButton.dataset.playerId,
-        moveButton.dataset.movePlayer
-      );
-
-      return;
-    }
-
-
-    const pageButton =
-      event.target.closest(
-        "[data-page]"
-      );
-
-    if (pageButton) {
-
-      navigate(
-        pageButton.dataset.page
-      );
-
-      return;
-    }
-
-
-    const classButton =
-      event.target.closest(
-        "[data-toggle-class]"
-      );
-
-    if (classButton) {
-
-      togglePlayerGroup(
-        classButton.dataset.toggleClass
-      );
-
-      return;
-    }
-
-
-    const categoryButton =
-      event.target.closest(
-        "[data-news-category]"
-      );
-
-    if (categoryButton) {
-
-      filterNews(
-        categoryButton.dataset.newsCategory
-      );
-
-      return;
-    }
-
-
-    const deleteNewsButton =
-      event.target.closest(
-        "[data-delete-news]"
-      );
-
-    if (deleteNewsButton) {
-
-      await deleteNews(
-        deleteNewsButton.dataset.deleteNews
-      );
-
-      return;
-    }
-
-
-    const deleteCategoryButton =
-      event.target.closest(
-        "[data-delete-category]"
-      );
-
-    if (deleteCategoryButton) {
-
-      await deleteCategory(
-        deleteCategoryButton.dataset.deleteCategory
-      );
-
-      return;
-    }
-
-
-    const deletePlayerButton =
-      event.target.closest(
-        "[data-delete-player]"
-      );
-
-    if (deletePlayerButton) {
-
-      await deletePlayer(
-        deletePlayerButton.dataset.deletePlayer
-      );
-
-      return;
-    }
-
-
-    const deleteTeamButton =
-      event.target.closest(
-        "[data-delete-team]"
-      );
-
-    if (deleteTeamButton) {
-
-      await deleteTeam(
-        deleteTeamButton.dataset.deleteTeam
-      );
-
-      return;
-    }
-
-
-    const deleteSelectionButton =
-      event.target.closest(
-        "[data-delete-selection]"
-      );
-
-    if (deleteSelectionButton) {
-
-      await deleteSelection(
-        deleteSelectionButton.dataset.deleteSelection
-      );
-
-      return;
-    }
-
-
-    const logoutButton =
-      event.target.closest(
-        "[data-logout]"
-      );
-
-    if (logoutButton) {
-
-      await logout();
-
-      return;
-    }
-  }
-);
-
-
-/* =========================
-   FORMULÁRIOS
-========================= */
-
-document.addEventListener(
-  "submit",
-  async event => {
-
-    if (
-      event.target.id ===
-      "links-form"
-    ) {
-
-      await saveLinks(event);
-
-      return;
-    }
-
-
-    if (
-      event.target.id ===
-      "table-form"
-    ) {
-
-      await saveTable(event);
-
-      return;
-    }
-
-
-    if (
-      event.target.id ===
-      "category-form"
-    ) {
-
-      await createCategory(event);
-
-      return;
-    }
-
-
-    if (
-      event.target.id ===
-      "news-form"
-    ) {
-
-      await createNews(event);
-
-      return;
-    }
-
-
-    if (
-      event.target.id ===
-      "player-form"
-    ) {
-
-      await createPlayer(event);
-
-      return;
-    }
-
-
-    if (
-      event.target.id ===
-      "team-form"
-    ) {
-
-      await createTeam(event);
-
-      return;
-    }
-
-
-    if (
-      event.target.id ===
-      "selection-form"
-    ) {
-
-      await createSelection(event);
-
-      return;
-    }
-  }
-);
 
 
 /* =========================
    LOGIN
-========================= */
+   ========================= */
 
-document.addEventListener(
-  "click",
-  event => {
+function openLogin() {
 
-    const loginButton =
-      event.target.closest(
-        "#login-button"
-      );
-
-    if (loginButton) {
-
-      login();
-
-      return;
-    }
+  let modal =
+    $("#admin-login-modal");
 
 
-    const closeButton =
-      event.target.closest(
-        "#close-login"
-      );
-
-    if (closeButton) {
-
-      hideLogin();
-
-      return;
-    }
+  if (modal) {
+    modal.remove();
   }
-);
+
+
+  modal =
+    document.createElement("div");
+
+  modal.id =
+    "admin-login-modal";
+
+  modal.className =
+    "modal";
+
+
+  modal.innerHTML = `
+
+    <div class="modal-box">
+
+      <button
+        class="modal-close"
+        id="close-admin-login"
+      >
+        ×
+      </button>
+
+
+      <h2>
+        Área Administrativa
+      </h2>
+
+
+      <p>
+        Digite a senha de administrador.
+      </p>
+
+
+      <input
+        id="admin-login-password"
+        type="password"
+        placeholder="Senha"
+      >
+
+
+      <button
+        id="admin-login-button"
+        class="primary-button"
+      >
+        Entrar
+      </button>
+
+
+      <div
+        id="admin-login-error"
+        class="login-error"
+      ></div>
+
+    </div>
+
+  `;
+
+
+  document.body.appendChild(modal);
+
+
+  const close =
+    $("#close-admin-login");
+
+  const password =
+    $("#admin-login-password");
+
+  const loginButton =
+    $("#admin-login-button");
+
+  const error =
+    $("#admin-login-error");
+
+
+  close.onclick = () => {
+    modal.remove();
+  };
+
+
+  setTimeout(() => {
+    password.focus();
+  }, 50);
+
+
+  password.onkeydown =
+    event => {
+
+      if (event.key === "Enter") {
+        loginButton.click();
+      }
+
+    };
+
+
+  loginButton.onclick =
+    async () => {
+
+      try {
+
+        await api(
+          "/api/admin/login",
+          {
+            method: "POST",
+
+            body: JSON.stringify({
+              password:
+                password.value
+            })
+          }
+        );
+
+
+        modal.remove();
+
+        isAdmin = true;
+
+        render("admin");
+
+        toast(
+          "Login realizado com sucesso."
+        );
+
+
+      } catch (err) {
+
+        error.textContent =
+          err.message;
+
+      }
+
+    };
+
+}
 
 
 /* =========================
-   INICIALIZAÇÃO
-========================= */
+   EVENTOS DAS PÁGINAS
+   ========================= */
 
-(async function init() {
+function bindPageEvents() {
 
-  await checkAdmin();
 
-  await loadData();
+  /* ABRIR CLASSE */
 
-})();
+  document
+    .querySelectorAll(
+      "[data-toggle-class]"
+    )
+    .forEach(button => {
+
+      button.onclick = () => {
+
+        const group =
+          button.dataset.toggleClass;
+
+
+        if (
+          openClasses.has(group)
+        ) {
+          openClasses.delete(group);
+        }
+
+        else {
+          openClasses.add(group);
+        }
+
+
+        render("players");
+
+      };
+
+    });
+
+
+  /* ABRIR CATEGORIA NEWS */
+
+  document
+    .querySelectorAll(
+      "[data-news-toggle]"
+    )
+    .forEach(button => {
+
+      button.onclick = () => {
+
+        const category =
+          button.dataset.newsToggle;
+
+
+        if (
+          openNewsCategories.has(
+            category
+          )
+        ) {
+          openNewsCategories.delete(
+            category
+          );
+        }
+
+        else {
+          openNewsCategories.add(
+            category
+          );
+        }
+
+
+        render("news");
+
+      };
+
+    });
+
+
+  /* SALVAR LINKS */
+
+  const linksForm =
+    $("#links-form");
+
+  if (linksForm) {
+
+    linksForm.onsubmit =
+      async event => {
+
+        event.preventDefault();
+
+        try {
+
+          await api(
+            "/api/admin/links",
+            {
+              method: "PUT",
+
+              body: JSON.stringify({
+                discord:
+                  $("#discordLink").value
+                    .trim(),
+
+                tiktok:
+                  $("#tiktokLink").value
+                    .trim(),
+
+                tabela:
+                  $("#tableLink").value
+                    .trim()
+              })
+            }
+          );
+
+
+          await loadData();
+
+          toast(
+            "Links salvos."
+          );
+
+        } catch (error) {
+
+          toast(error.message);
+
+        }
+
+      };
+
+  }
+
+
+  /* CATEGORIA */
+
+  const categoryForm =
+    $("#category-form");
+
+  if (categoryForm) {
+
+    categoryForm.onsubmit =
+      async event => {
+
+        event.preventDefault();
+
+        const name =
+          $("#categoryName")
+            .value
+            .trim();
+
+
+        if (!name) {
+          toast(
+            "Digite o nome da categoria."
+          );
+          return;
+        }
+
+
+        try {
+
+          await api(
+            "/api/admin/categories",
+            {
+              method: "POST",
+
+              body: JSON.stringify({
+                name
+              })
+            }
+          );
+
+
+          await loadData();
+
+          render("admin");
+
+          toast(
+            "Categoria criada."
+          );
+
+        } catch (error) {
+
+          toast(error.message);
+
+        }
+
+      };
+
+  }
+
+
+  /* EXCLUIR CATEGORIA */
+
+  document
+    .querySelectorAll(
+      "[data-delete-category]"
+    )
+    .forEach(button => {
+
+      button.onclick =
+        async () => {
+
+          const category =
+            button.dataset.deleteCategory;
+
+
+          if (
+            !confirm(
+              `Excluir a categoria "${category}"?`
+            )
+          ) {
+            return;
+          }
+
+
+          try {
+
+            await api(
+              "/api/admin/categories/" +
+              encodeURIComponent(category),
+              {
+                method: "DELETE"
+              }
+            );
+
+
+            await loadData();
+
+            render("admin");
+
+            toast(
+              "Categoria excluída."
+            );
+
+          } catch (error) {
+
+            toast(error.message);
+
+          }
+
+        };
+
+    });
+
+
+  /* NEWS */
+
+  const newsForm =
+    $("#news-form");
+
+  if (newsForm) {
+
+    newsForm.onsubmit =
+      async event => {
+
+        event.preventDefault();
+
+
+        try {
+
+          await api(
+            "/api/admin/news",
+            {
+              method: "POST",
+
+              body: JSON.stringify({
+
+                title:
+                  $("#newsTitle")
+                    .value
+                    .trim(),
+
+                description:
+                  $("#newsDescription")
+                    .value
+                    .trim(),
+
+                image:
+                  $("#newsImage")
+                    .value
+                    .trim(),
+
+                category:
+                  $("#newsCategory")
+                    .value
+
+              })
+            }
+          );
+
+
+          await loadData();
+
+          render("admin");
+
+          toast(
+            "Notícia publicada."
+          );
+
+        } catch (error) {
+
+          toast(error.message);
+
+        }
+
+      };
+
+  }
+
+
+  /* EXCLUIR NEWS */
+
+  document
+    .querySelectorAll(
+      "[data-delete-news]"
+    )
+    .forEach(button => {
+
+      button.onclick =
+        async () => {
+
+          if (
+            !confirm(
+              "Excluir esta notícia?"
+            )
+          ) {
+            return;
+          }
+
+
+          try {
+
+            await api(
+              "/api/admin/news/" +
+              encodeURIComponent(
+                button.dataset.deleteNews
+              ),
+              {
+                method: "DELETE"
+              }
+            );
+
+
+            await loadData();
+
+            render("admin");
+
+            toast(
+              "Notícia excluída."
+            );
+
+          } catch (error) {
+
+            toast(error.message);
+
+          }
+
+        };
+
+    });
+
+
+  /* JOGADOR */
+
+  const playerForm =
+    $("#player-form");
+
+  if (playerForm) {
+
+    playerForm.onsubmit =
+      async event => {
+
+        event.preventDefault();
+
+
+        const id =
+          $("#playerId")
+            .value
+            .trim();
+
+        const nick =
+          $("#playerNick")
+            .value
+            .trim();
+
+        const playerClassValue =
+          $("#playerClass")
+            .value;
+
+        const overallValue =
+          $("#playerOverall")
+            .value
+            .trim();
+
+        const teamId =
+          $("#playerTeam")
+            .value;
+
+        const role =
+          $("#playerRole")
+            .value;
+
+
+        if (!id || !nick) {
+
+          toast(
+            "ID e Nick são obrigatórios."
+          );
+
+          return;
+
+        }
+
+
+        if (
+          overallValue !== "" &&
+          (
+            Number(overallValue) < 0 ||
+            Number(overallValue) > 100
+          )
+        ) {
+
+          toast(
+            "Overall deve ficar entre 0 e 100."
+          );
+
+          return;
+
+        }
+
+
+        try {
+
+          await api(
+            "/api/admin/players",
+            {
+              method: "POST",
+
+              body: JSON.stringify({
+
+                id,
+
+                nick,
+
+                class:
+                  playerClassValue,
+
+                overall:
+                  overallValue === ""
+                    ? null
+                    : Number(
+                        overallValue
+                      ),
+
+                teamId,
+
+                role,
+
+                freeAgent:
+                  teamId ===
+                  "FREE AGENT"
+
+              })
+            }
+          );
+
+
+          await loadData();
+
+          render("admin");
+
+          toast(
+            "Jogador adicionado."
+          );
+
+        } catch (error) {
+
+          toast(error.message);
+
+        }
+
+      };
+
+  }
+
+
+  /* EXCLUIR JOGADOR */
+
+  document
+    .querySelectorAll(
+      "[data-delete-player]"
+    )
+    .forEach(button => {
+
+      button.onclick =
+        async () => {
+
+          if (
+            !confirm(
+              "Excluir este jogador?"
+            )
+          ) {
+            return;
+          }
+
+
+          try {
+
+            await api(
+              "/api/admin/players/" +
+              encodeURIComponent(
+                button.dataset.deletePlayer
+              ),
+              {
+                method: "DELETE"
+              }
+            );
+
+
+            await loadData();
+
+            render("admin");
+
+            toast(
+              "Jogador excluído."
+            );
+
+          } catch (error) {
+
+            toast(error.message);
+
+          }
+
+        };
+
+    });
+
+
+  /* TIME */
+
+  const teamForm =
+    $("#team-form");
+
+  if (teamForm) {
+
+    teamForm.onsubmit =
+      async event => {
+
+        event.preventDefault();
+
+
+        const name =
+          $("#teamName")
+            .value
+            .trim();
+
+
+        if (!name) {
+
+          toast(
+            "Digite o nome do time."
+          );
+
+          return;
+
+        }
+
+
+        try {
+
+          await api(
+            "/api/admin/teams",
+            {
+              method: "POST",
+
+              body: JSON.stringify({
+
+                name,
+
+                logo:
+                  $("#teamLogo")
+                    .value
+                    .trim(),
+
+                color:
+                  $("#teamColor")
+                    .value,
+
+                link:
+                  $("#teamLink")
+                    .value
+                    .trim(),
+
+                players: []
+
+              })
+            }
+          );
+
+
+          await loadData();
+
+          render("admin");
+
+          toast(
+            "Time criado."
+          );
+
+        } catch (error) {
+
+          toast(error.message);
+
+        }
+
+      };
+
+  }
+
+
+  /* EXCLUIR TIME */
+
+  document
+    .querySelectorAll(
+      "[data-delete-team]"
+    )
+    .forEach(button => {
+
+      button.onclick =
+        async () => {
+
+          if (
+            !confirm(
+              "Excluir este time?"
+            )
+          ) {
+            return;
+          }
+
+
+          try {
+
+            await api(
+              "/api/admin/teams/" +
+              encodeURIComponent(
+                button.dataset.deleteTeam
+              ),
+              {
+                method: "DELETE"
+              }
+            );
+
+
+            await loadData();
+
+            render("admin");
+
+            toast(
+              "Time excluído."
+            );
+
+          } catch (error) {
+
+            toast(error.message);
+
+          }
+
+        };
+
+    });
+
+
+  /* SELEÇÃO */
+
+  const selectionForm =
+    $("#selection-form");
+
+  if (selectionForm) {
+
+    selectionForm.onsubmit =
+      async event => {
+
+        event.preventDefault();
+
+
+        const players =
+          [
+            ...document.querySelectorAll(
+              "[data-selection-player]:checked"
+            )
+          ]
+          .map(input => input.value);
+
+
+        if (players.length > 16) {
+
+          toast(
+            "Uma seleção pode ter no máximo 16 jogadores."
+          );
+
+          return;
+
+        }
+
+
+        const name =
+          $("#selectionName")
+            .value
+            .trim();
+
+
+        if (!name) {
+
+          toast(
+            "Digite o nome da seleção."
+          );
+
+          return;
+
+        }
+
+
+        try {
+
+          await api(
+            "/api/admin/selections",
+            {
+              method: "POST",
+
+              body: JSON.stringify({
+
+                name,
+
+                logo:
+                  $("#selectionLogo")
+                    .value
+                    .trim(),
+
+                color:
+                  $("#selectionColor")
+                    .value,
+
+                link:
+                  $("#selectionLink")
+                    .value
+                    .trim(),
+
+                players
+
+              })
+            }
+          );
+
+
+          await loadData();
+
+          render("admin");
+
+          toast(
+            "Seleção criada."
+          );
+
+        } catch (error) {
+
+          toast(error.message);
+
+        }
+
+      };
+
+  }
+
+
+  /* EXCLUIR SELEÇÃO */
+
+  document
+    .querySelectorAll(
+      "[data-delete-selection]"
+    )
+    .forEach(button => {
+
+      button.onclick =
+        async () => {
+
+          if (
+            !confirm(
+              "Excluir esta seleção?"
+            )
+          ) {
+            return;
+          }
+
+
+          try {
+
+            await api(
+              "/api/admin/selections/" +
+              encodeURIComponent(
+                button.dataset.deleteSelection
+              ),
+              {
+                method: "DELETE"
+              }
+            );
+
+
+            await loadData();
+
+            render("admin");
+
+            toast(
+              "Seleção excluída."
+            );
+
+          } catch (error) {
+
+            toast(error.message);
+
+          }
+
+        };
+
+    });
+
+
+  /* LOGOUT */
+
+  const logoutButton =
+    $("#logout-button");
+
+  if (logoutButton) {
+
+    logoutButton.onclick =
+      async () => {
+
+        try {
+
+          await api(
+            "/api/admin/logout",
+            {
+              method: "POST"
+            }
+          );
+
+
+          isAdmin = false;
+
+          render("news");
+
+          toast(
+            "Sessão encerrada."
+          );
+
+        } catch (error) {
+
+          toast(error.message);
+
+        }
+
+      };
+
+  }
+
+}
+
+
+/* =========================
+   INICIAR SITE
+   ========================= */
+
+setupNavigation();
+
+loadData();
