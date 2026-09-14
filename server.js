@@ -4,673 +4,32 @@ const fs = require("fs");
 const path = require("path");
 
 const app = express();
-
 const PORT = process.env.PORT || 3000;
 
 const ADMIN_PASSWORD =
-  process.env.ADMIN_PASSWORD ||
-  "ultimatetcsleaguesite6742";
+  process.env.ADMIN_PASSWORD || "ultimatetcsleaguesite6742";
 
-const DATA_FILE =
-  path.join(__dirname, "data.json");
+const SESSION_SECRET =
+  process.env.SESSION_SECRET || "utl-session-secret";
 
+const DATA_FILE = path.join(__dirname, "data.json");
 
-/* =========================
-   APP
-   ========================= */
-
-app.use(express.json({
-  limit: "5mb"
-}));
-
-app.use(express.urlencoded({
-  extended: true
-}));
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true }));
 
 app.use(
   session({
-    secret:
-      process.env.SESSION_SECRET ||
-      "utl-session-secret",
-
+    secret: SESSION_SECRET,
     resave: false,
-
     saveUninitialized: false,
-
     cookie: {
-      maxAge:
-        1000 * 60 * 60 * 24
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 1000 * 60 * 60 * 24
     }
   })
 );
-
-
-/* =========================
-   DADOS PADRÃO
-   ========================= */
-
-const DEFAULT_DATA = {
-  links: {
-    discord: "",
-    tiktok: "",
-    tabela: ""
-  },
-
-  newsCategories: [
-    "Geral"
-  ],
-
-  news: [],
-
-  players: [],
-
-  selections: [],
-
-  teams: []
-};
-
-
-/* =========================
-   BANCO JSON
-   ========================= */
-
-function ensureDataFile() {
-
-  if (!fs.existsSync(DATA_FILE)) {
-
-    fs.writeFileSync(
-      DATA_FILE,
-      JSON.stringify(
-        DEFAULT_DATA,
-        null,
-        2
-      )
-    );
-
-  }
-
-}
-
-
-function normalizeData(data) {
-
-  const result = {
-    ...DEFAULT_DATA,
-    ...data
-  };
-
-
-  result.links = {
-    ...DEFAULT_DATA.links,
-    ...(data.links || {})
-  };
-
-
-  result.newsCategories =
-    Array.isArray(
-      data.newsCategories
-    )
-      ? data.newsCategories
-      : ["Geral"];
-
-
-  if (
-    !result.newsCategories.includes(
-      "Geral"
-    )
-  ) {
-    result.newsCategories.unshift(
-      "Geral"
-    );
-  }
-
-
-  result.news =
-    Array.isArray(data.news)
-      ? data.news
-      : [];
-
-
-  result.players =
-    Array.isArray(data.players)
-      ? data.players
-      : [];
-
-
-  result.selections =
-    Array.isArray(data.selections)
-      ? data.selections
-      : [];
-
-
-  result.teams =
-    Array.isArray(data.teams)
-      ? data.teams
-      : [];
-
-
-  return result;
-}
-
-
-function readData() {
-
-  ensureDataFile();
-
-  try {
-
-    const raw =
-      fs.readFileSync(
-        DATA_FILE,
-        "utf8"
-      );
-
-    return normalizeData(
-      JSON.parse(raw)
-    );
-
-  } catch (error) {
-
-    console.error(
-      "Erro ao ler data.json:",
-      error
-    );
-
-    return normalizeData(
-      DEFAULT_DATA
-    );
-
-  }
-
-}
-
-
-function writeData(data) {
-
-  fs.writeFileSync(
-    DATA_FILE,
-
-    JSON.stringify(
-      normalizeData(data),
-      null,
-      2
-    )
-  );
-
-}
-
-
-/* =========================
-   ID
-   ========================= */
-
-function generateId(prefix) {
-
-  return (
-    prefix +
-    "_" +
-    Date.now().toString(36) +
-    "_" +
-    Math.random()
-      .toString(36)
-      .slice(2, 8)
-  );
-
-}
-
-
-/* =========================
-   ADMIN
-   ========================= */
-
-function requireAdmin(
-  req,
-  res,
-  next
-) {
-
-  if (!req.session.admin) {
-
-    return res.status(401).json({
-      error:
-        "Você precisa estar logado como administrador."
-    });
-
-  }
-
-  next();
-
-}
-
-
-/* =========================
-   DATA PÚBLICA
-   ========================= */
-
-app.get(
-  "/api/data",
-  (req, res) => {
-
-    res.json(
-      readData()
-    );
-
-  }
-);
-
-
-/* =========================
-   STATUS ADMIN
-   ========================= */
-
-app.get(
-  "/api/admin/status",
-  (req, res) => {
-
-    res.json({
-      admin:
-        !!req.session.admin
-    });
-
-  }
-);
-
-
-/* =========================
-   LOGIN
-   ========================= */
-
-app.post(
-  "/api/admin/login",
-  (req, res) => {
-
-    const password =
-      String(
-        req.body.password || ""
-      );
-
-
-    if (
-      password !==
-      ADMIN_PASSWORD
-    ) {
-
-      return res.status(401).json({
-        error:
-          "Senha incorreta."
-      });
-
-    }
-
-
-    req.session.admin = true;
-
-
-    res.json({
-      success: true
-    });
-
-  }
-);
-
-
-/* =========================
-   LOGOUT
-   ========================= */
-
-app.post(
-  "/api/admin/logout",
-  (req, res) => {
-
-    req.session.destroy(
-      error => {
-
-        if (error) {
-
-          return res.status(500)
-            .json({
-              error:
-                "Não foi possível sair."
-            });
-
-        }
-
-
-        res.json({
-          success: true
-        });
-
-      }
-    );
-
-  }
-);
-
-
-/* =========================
-   LINKS
-   ========================= */
-
-app.put(
-  "/api/admin/links",
-  requireAdmin,
-  (req, res) => {
-
-    const data =
-      readData();
-
-
-    data.links = {
-
-      discord:
-        String(
-          req.body.discord || ""
-        ).trim(),
-
-      tiktok:
-        String(
-          req.body.tiktok || ""
-        ).trim(),
-
-      tabela:
-        String(
-          req.body.tabela || ""
-        ).trim()
-
-    };
-
-
-    writeData(data);
-
-
-    res.json({
-      success: true,
-      links: data.links
-    });
-
-  }
-);
-
-
-/* =========================
-   CATEGORIAS NEWS
-   ========================= */
-
-app.post(
-  "/api/admin/categories",
-  requireAdmin,
-  (req, res) => {
-
-    const name =
-      String(
-        req.body.name || ""
-      ).trim();
-
-
-    if (!name) {
-
-      return res.status(400).json({
-        error:
-          "Nome da categoria obrigatório."
-      });
-
-    }
-
-
-    const data =
-      readData();
-
-
-    const exists =
-      data.newsCategories.some(
-        category =>
-          category.toLowerCase() ===
-          name.toLowerCase()
-      );
-
-
-    if (exists) {
-
-      return res.status(400).json({
-        error:
-          "Essa categoria já existe."
-      });
-
-    }
-
-
-    data.newsCategories.push(
-      name
-    );
-
-
-    writeData(data);
-
-
-    res.json({
-      success: true,
-      categories:
-        data.newsCategories
-    });
-
-  }
-);
-
-
-app.delete(
-  "/api/admin/categories/:name",
-  requireAdmin,
-  (req, res) => {
-
-    const name =
-      decodeURIComponent(
-        req.params.name
-      );
-
-
-    if (
-      name.toLowerCase() ===
-      "geral"
-    ) {
-
-      return res.status(400).json({
-        error:
-          "A categoria Geral não pode ser excluída."
-      });
-
-    }
-
-
-    const data =
-      readData();
-
-
-    data.newsCategories =
-      data.newsCategories.filter(
-        category =>
-          category !== name
-      );
-
-
-    data.news =
-      data.news.map(news => {
-
-        if (
-          news.category === name
-        ) {
-
-          return {
-            ...news,
-            category: "Geral"
-          };
-
-        }
-
-        return news;
-
-      });
-
-
-    writeData(data);
-
-
-    res.json({
-      success: true
-    });
-
-  }
-);
-
-
-/* =========================
-   NEWS
-   ========================= */
-
-app.post(
-  "/api/admin/news",
-  requireAdmin,
-  (req, res) => {
-
-    const title =
-      String(
-        req.body.title || ""
-      ).trim();
-
-
-    const description =
-      String(
-        req.body.description || ""
-      ).trim();
-
-
-    const image =
-      String(
-        req.body.image || ""
-      ).trim();
-
-
-    const category =
-      String(
-        req.body.category ||
-        "Geral"
-      ).trim();
-
-
-    if (
-      !title ||
-      !description
-    ) {
-
-      return res.status(400).json({
-        error:
-          "Título e descrição são obrigatórios."
-      });
-
-    }
-
-
-    const data =
-      readData();
-
-
-    if (
-      !data.newsCategories.includes(
-        category
-      )
-    ) {
-
-      return res.status(400).json({
-        error:
-          "Categoria inválida."
-      });
-
-    }
-
-
-    const news = {
-
-      id:
-        generateId("news"),
-
-      title,
-
-      description,
-
-      image,
-
-      category,
-
-      createdAt:
-        new Date().toISOString()
-
-    };
-
-
-    data.news.unshift(
-      news
-    );
-
-
-    writeData(data);
-
-
-    res.json({
-      success: true,
-      news
-    });
-
-  }
-);
-
-
-app.delete(
-  "/api/admin/news/:id",
-  requireAdmin,
-  (req, res) => {
-
-    const data =
-      readData();
-
-
-    const before =
-      data.news.length;
-
-
-    data.news =
-      data.news.filter(
-        news =>
-          String(news.id) !==
-          String(req.params.id)
-      );
-
-
-    if (
-      data.news.length ===
-      before
-    ) {
-
-      return res.status(404).json({
-        error:
-          "Notícia não encontrada."
-      });
-
-    }
-
-
-    writeData(data);
-
-
-    res.json({
-      success: true
-    });
-
-  }
-);
-
-
-/* =========================
-   JOGADORES
-   ========================= */
 
 const CLASS_ORDER = [
   "X",
@@ -689,979 +48,705 @@ const CLASS_ORDER = [
   "D"
 ];
 
+const WAGES = {
+  "S+": 350000,
+  "S": 325000,
+  "S-": 300000,
+  "A+": 275000,
+  "A": 250000,
+  "A-": 200000,
+  "B+": 175000,
+  "B": 150000,
+  "B-": 125000,
+  "C+": 100000,
+  "C": 90000,
+  "C-": 85000,
+  "D": 75000
+};
 
-function getClassIndex(
-  playerClass
-) {
+const X_WAGES = [
+  380000,
+  385000,
+  390000,
+  395000,
+  400000
+];
 
-  const index =
-    CLASS_ORDER.indexOf(
-      String(
-        playerClass || "D"
-      ).toUpperCase()
-    );
+const ROLES = [
+  "PLAYER",
+  "ASSIST MANAGER",
+  "MANAGER"
+];
 
-
-  return index === -1
-    ? CLASS_ORDER.length - 1
-    : index;
-
+function defaultData() {
+  return {
+    links: {
+      discord: "",
+      tiktok: "",
+      tabela: ""
+    },
+    newsCategories: ["Geral"],
+    news: [],
+    players: [],
+    selections: [],
+    teams: []
+  };
 }
 
+function loadData() {
+  try {
+    if (!fs.existsSync(DATA_FILE)) {
+      const data = defaultData();
+      saveData(data);
+      return data;
+    }
 
-function getBaseClass(
-  playerClass
-) {
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
 
-  const value =
-    String(
-      playerClass || "D"
-    ).toUpperCase();
+    return {
+      links: data.links || {
+        discord: "",
+        tiktok: "",
+        tabela: ""
+      },
+      newsCategories:
+        Array.isArray(data.newsCategories) && data.newsCategories.length
+          ? data.newsCategories
+          : ["Geral"],
+      news: Array.isArray(data.news) ? data.news : [],
+      players: Array.isArray(data.players) ? data.players : [],
+      selections: Array.isArray(data.selections)
+        ? data.selections
+        : [],
+      teams: Array.isArray(data.teams) ? data.teams : []
+    };
+  } catch (error) {
+    console.error("Erro ao carregar data.json:", error);
+    return defaultData();
+  }
+}
 
+function saveData(data) {
+  fs.writeFileSync(
+    DATA_FILE,
+    JSON.stringify(data, null, 2),
+    "utf8"
+  );
+}
 
-  if (value === "X") {
-    return "X";
+let DATA = loadData();
+
+function adminOnly(req, res, next) {
+  if (!req.session.isAdmin) {
+    return res.status(401).json({
+      error: "Não autorizado."
+    });
   }
 
-
-  return value.charAt(0);
-
+  next();
 }
 
+function clean(value) {
+  return String(value ?? "").trim();
+}
 
-/*
-  Reorganiza automaticamente:
+function validClass(value) {
+  return CLASS_ORDER.includes(value);
+}
 
-  S+  primeiro
-  S   depois
-  S-  último
+function validRole(value) {
+  return ROLES.includes(value);
+}
 
-  A+  primeiro
-  A   depois
-  A-  último
+function getPlayerClass(player) {
+  return player.class || "D";
+}
 
-  etc.
+function getPlayerWage(player) {
+  const playerClass = getPlayerClass(player);
 
-  Dentro da mesma classe,
-  o campo order mantém a posição.
-*/
+  if (playerClass === "X") {
+    const wage = Number(player.wage);
 
-function normalizePlayerOrder(
-  players
-) {
-
-  const groups = {};
-
-
-  players.forEach(player => {
-
-    const group =
-      getBaseClass(
-        player.class
-      );
-
-
-    if (!groups[group]) {
-      groups[group] = [];
+    if (X_WAGES.includes(wage)) {
+      return wage;
     }
 
+    return 380000;
+  }
 
-    groups[group].push(
-      player
-    );
+  return WAGES[playerClass] || 75000;
+}
 
+function normalizePlayer(player, index = 0) {
+  const playerClass = validClass(player.class)
+    ? player.class
+    : "D";
+
+  const role = validRole(player.role)
+    ? player.role
+    : "PLAYER";
+
+  let wage = getPlayerWage({
+    ...player,
+    class: playerClass
   });
 
+  if (playerClass === "X" && !X_WAGES.includes(Number(player.wage))) {
+    wage = 380000;
+  }
 
-  Object.values(groups)
-    .forEach(group => {
-
-      group.sort(
-        (a, b) => {
-
-          const classDifference =
-            getClassIndex(
-              a.class
-            ) -
-            getClassIndex(
-              b.class
-            );
-
-
-          if (
-            classDifference !== 0
-          ) {
-
-            return classDifference;
-
-          }
-
-
-          return (
-            Number(a.order) || 0
-          ) -
-          (
-            Number(b.order) || 0
-          );
-
-        }
-      );
-
-
-      group.forEach(
-        (player, index) => {
-
-          player.order =
-            index;
-
-        }
-      );
-
-    });
-
-
-  return players;
+  return {
+    id: clean(player.id),
+    nick: clean(player.nick),
+    class: playerClass,
+    overall: Math.max(
+      0,
+      Math.min(100, Number(player.overall) || 0)
+    ),
+    teamId: clean(player.teamId || player.team || ""),
+    role,
+    wage,
+    freeAgent:
+      !clean(player.teamId || player.team),
+    order:
+      Number.isFinite(Number(player.order))
+        ? Number(player.order)
+        : index
+  };
 }
 
+function normalizePlayers() {
+  DATA.players = DATA.players.map(normalizePlayer);
 
-/* CRIAR JOGADOR */
+  DATA.players.sort((a, b) => {
+    const classA = CLASS_ORDER.indexOf(a.class);
+    const classB = CLASS_ORDER.indexOf(b.class);
+
+    if (classA !== classB) {
+      return classA - classB;
+    }
+
+    return a.order - b.order;
+  });
+
+  DATA.players.forEach((player, index) => {
+    player.order = index;
+  });
+}
+
+normalizePlayers();
+saveData(DATA);
+
+function makeId(prefix = "id") {
+  return (
+    prefix +
+    "_" +
+    Date.now().toString(36) +
+    "_" +
+    Math.random().toString(36).slice(2, 8)
+  );
+}
+
+/* =========================
+   PUBLIC API
+========================= */
+
+app.get("/api/data", (req, res) => {
+  normalizePlayers();
+
+  res.json(DATA);
+});
+
+app.get("/api/admin/status", (req, res) => {
+  res.json({
+    loggedIn: !!req.session.isAdmin
+  });
+});
+
+/* =========================
+   LOGIN
+========================= */
+
+app.post("/api/admin/login", (req, res) => {
+  const password = clean(req.body.password);
+
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({
+      error: "Senha incorreta."
+    });
+  }
+
+  req.session.isAdmin = true;
+
+  res.json({
+    success: true
+  });
+});
+
+app.post("/api/admin/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.json({
+      success: true
+    });
+  });
+});
+
+/* =========================
+   LINKS
+========================= */
+
+app.put("/api/admin/links", adminOnly, (req, res) => {
+  DATA.links = {
+    discord: clean(req.body.discord),
+    tiktok: clean(req.body.tiktok),
+    tabela: clean(req.body.tabela)
+  };
+
+  saveData(DATA);
+
+  res.json({
+    success: true,
+    links: DATA.links
+  });
+});
+
+/* =========================
+   NEWS CATEGORIES
+========================= */
 
 app.post(
-  "/api/admin/players",
-  requireAdmin,
+  "/api/admin/news-categories",
+  adminOnly,
   (req, res) => {
+    const name = clean(req.body.name);
 
-    const data =
-      readData();
-
-
-    const id =
-      String(
-        req.body.id || ""
-      ).trim();
-
-
-    const nick =
-      String(
-        req.body.nick || ""
-      ).trim();
-
-
-    const playerClass =
-      String(
-        req.body.class || "D"
-      ).toUpperCase();
-
-
-    const role =
-      String(
-        req.body.role ||
-        "PLAYER"
-      ).trim();
-
-
-    const teamId =
-      String(
-        req.body.teamId ||
-        "FREE AGENT"
-      );
-
-
-    let overall =
-      req.body.overall;
-
-
-    if (!id || !nick) {
-
+    if (!name) {
       return res.status(400).json({
-        error:
-          "ID e Nick são obrigatórios."
+        error: "Informe o nome da categoria."
       });
-
     }
 
-
     if (
-      data.players.some(
-        player =>
-          String(player.id) === id
+      DATA.newsCategories.some(
+        category =>
+          category.toLowerCase() === name.toLowerCase()
       )
     ) {
-
       return res.status(400).json({
-        error:
-          "Já existe um jogador com esse ID."
+        error: "Essa categoria já existe."
       });
-
     }
 
+    DATA.newsCategories.push(name);
 
-    if (
-      !CLASS_ORDER.includes(
-        playerClass
-      )
-    ) {
-
-      return res.status(400).json({
-        error:
-          "Classe inválida."
-      });
-
-    }
-
-
-    if (
-      ![
-        "PLAYER",
-        "ASSIST MANAGER",
-        "MANAGER"
-      ].includes(role)
-    ) {
-
-      return res.status(400).json({
-        error:
-          "Role inválida."
-      });
-
-    }
-
-
-    if (
-      overall === "" ||
-      overall === null ||
-      overall === undefined
-    ) {
-
-      overall = null;
-
-    }
-
-    else {
-
-      overall =
-        Number(overall);
-
-
-      if (
-        !Number.isFinite(
-          overall
-        ) ||
-        overall < 0 ||
-        overall > 100
-      ) {
-
-        return res.status(400).json({
-          error:
-            "Overall deve estar entre 0 e 100."
-        });
-
-      }
-
-    }
-
-
-    if (
-      teamId !==
-      "FREE AGENT"
-    ) {
-
-      const teamExists =
-        data.teams.some(
-          team =>
-            String(team.id) ===
-            String(teamId)
-        );
-
-
-      if (!teamExists) {
-
-        return res.status(400).json({
-          error:
-            "Time não encontrado."
-        });
-
-      }
-
-
-      const teamPlayers =
-        data.players.filter(
-          player =>
-            String(
-              player.teamId
-            ) ===
-            String(teamId)
-        );
-
-
-      if (
-        teamPlayers.length >= 16
-      ) {
-
-        return res.status(400).json({
-          error:
-            "Esse time já tem 16 jogadores."
-        });
-
-      }
-
-    }
-
-
-    const player = {
-
-      id,
-
-      nick,
-
-      class:
-        playerClass,
-
-      overall,
-
-      teamId:
-        teamId ===
-        "FREE AGENT"
-          ? null
-          : teamId,
-
-      role,
-
-      freeAgent:
-        teamId ===
-        "FREE AGENT",
-
-      order:
-        data.players.length
-
-    };
-
-
-    data.players.push(
-      player
-    );
-
-
-    normalizePlayerOrder(
-      data.players
-    );
-
-
-    writeData(data);
-
+    saveData(DATA);
 
     res.json({
       success: true,
-      player
+      categories: DATA.newsCategories
     });
-
   }
 );
 
+app.delete(
+  "/api/admin/news-categories/:name",
+  adminOnly,
+  (req, res) => {
+    const name = decodeURIComponent(req.params.name);
 
-/* EXCLUIR JOGADOR */
+    if (name === "Geral") {
+      return res.status(400).json({
+        error: "A categoria Geral não pode ser excluída."
+      });
+    }
+
+    DATA.newsCategories = DATA.newsCategories.filter(
+      category => category !== name
+    );
+
+    DATA.news.forEach(news => {
+      if (news.category === name) {
+        news.category = "Geral";
+      }
+    });
+
+    saveData(DATA);
+
+    res.json({
+      success: true,
+      categories: DATA.newsCategories
+    });
+  }
+);
+
+/* =========================
+   NEWS
+========================= */
+
+app.post("/api/admin/news", adminOnly, (req, res) => {
+  const title = clean(req.body.title);
+  const description = clean(req.body.description);
+  const image = clean(req.body.image);
+  const category = clean(req.body.category) || "Geral";
+
+  if (!title || !description) {
+    return res.status(400).json({
+      error: "Título e descrição são obrigatórios."
+    });
+  }
+
+  if (!DATA.newsCategories.includes(category)) {
+    return res.status(400).json({
+      error: "Categoria inválida."
+    });
+  }
+
+  const news = {
+    id: makeId("news"),
+    title,
+    description,
+    image,
+    category,
+    createdAt: Date.now()
+  };
+
+  DATA.news.unshift(news);
+
+  saveData(DATA);
+
+  res.json({
+    success: true,
+    news
+  });
+});
+
+app.delete("/api/admin/news/:id", adminOnly, (req, res) => {
+  DATA.news = DATA.news.filter(
+    news => news.id !== req.params.id
+  );
+
+  saveData(DATA);
+
+  res.json({
+    success: true
+  });
+});
+
+/* =========================
+   PLAYERS
+========================= */
+
+app.post("/api/admin/players", adminOnly, (req, res) => {
+  const id = clean(req.body.id);
+  const nick = clean(req.body.nick);
+  const playerClass = clean(req.body.class);
+  const role = clean(req.body.role);
+  const teamId = clean(req.body.teamId);
+  const overall = Number(req.body.overall);
+
+  if (!id || !nick) {
+    return res.status(400).json({
+      error: "ID e Nick são obrigatórios."
+    });
+  }
+
+  if (!validClass(playerClass)) {
+    return res.status(400).json({
+      error: "Classe inválida."
+    });
+  }
+
+  if (!validRole(role)) {
+    return res.status(400).json({
+      error: "Cargo inválido."
+    });
+  }
+
+  if (
+    !Number.isFinite(overall) ||
+    overall < 0 ||
+    overall > 100
+  ) {
+    return res.status(400).json({
+      error: "Overall deve estar entre 0 e 100."
+    });
+  }
+
+  if (
+    DATA.players.some(
+      player => String(player.id) === String(id)
+    )
+  ) {
+    return res.status(400).json({
+      error: "Já existe um jogador com esse ID."
+    });
+  }
+
+  if (teamId) {
+    const team = DATA.teams.find(
+      team => team.id === teamId
+    );
+
+    if (!team) {
+      return res.status(400).json({
+        error: "Time não encontrado."
+      });
+    }
+
+    const count = DATA.players.filter(
+      player => player.teamId === teamId
+    ).length;
+
+    if (count >= 16) {
+      return res.status(400).json({
+        error: "Esse time já possui 16 jogadores."
+      });
+    }
+  }
+
+  let wage;
+
+  if (playerClass === "X") {
+    wage = Number(req.body.wage);
+
+    if (!X_WAGES.includes(wage)) {
+      return res.status(400).json({
+        error:
+          "Para a classe X, o salário deve ser 380K, 385K, 390K, 395K ou 400K."
+      });
+    }
+  } else {
+    wage = WAGES[playerClass];
+  }
+
+  const player = {
+    id,
+    nick,
+    class: playerClass,
+    overall,
+    teamId,
+    role,
+    wage,
+    freeAgent: !teamId,
+    order: DATA.players.length
+  };
+
+  DATA.players.push(player);
+
+  normalizePlayers();
+  saveData(DATA);
+
+  res.json({
+    success: true,
+    player
+  });
+});
 
 app.delete(
   "/api/admin/players/:id",
-  requireAdmin,
+  adminOnly,
   (req, res) => {
+    const id = String(req.params.id);
 
-    const data =
-      readData();
-
-
-    const before =
-      data.players.length;
-
-
-    data.players =
-      data.players.filter(
-        player =>
-          String(player.id) !==
-          String(req.params.id)
-      );
-
-
-    if (
-      data.players.length ===
-      before
-    ) {
-
-      return res.status(404).json({
-        error:
-          "Jogador não encontrado."
-      });
-
-    }
-
-
-    data.selections =
-      data.selections.map(
-        selection => ({
-          ...selection,
-
-          players:
-            (selection.players || [])
-              .filter(
-                id =>
-                  String(id) !==
-                  String(req.params.id)
-              )
-
-        })
-      );
-
-
-    normalizePlayerOrder(
-      data.players
+    DATA.players = DATA.players.filter(
+      player => String(player.id) !== id
     );
 
+    DATA.selections.forEach(selection => {
+      selection.players = selection.players.filter(
+        playerId => String(playerId) !== id
+      );
+    });
 
-    writeData(data);
-
+    normalizePlayers();
+    saveData(DATA);
 
     res.json({
       success: true
     });
-
   }
 );
-
 
 /* =========================
-   ATUALIZAR JOGADOR
-   ========================= */
+   TEAMS
+========================= */
 
-app.put(
-  "/api/admin/players/:id",
-  requireAdmin,
-  (req, res) => {
+app.post("/api/admin/teams", adminOnly, (req, res) => {
+  const name = clean(req.body.name);
+  const color = clean(req.body.color) || "#b00020";
+  const logo = clean(req.body.logo);
 
-    const data =
-      readData();
-
-
-    const player =
-      data.players.find(
-        item =>
-          String(item.id) ===
-          String(req.params.id)
-      );
-
-
-    if (!player) {
-
-      return res.status(404).json({
-        error:
-          "Jogador não encontrado."
-      });
-
-    }
-
-
-    if (
-      req.body.nick !== undefined
-    ) {
-
-      player.nick =
-        String(
-          req.body.nick
-        ).trim();
-
-    }
-
-
-    if (
-      req.body.class !== undefined
-    ) {
-
-      const newClass =
-        String(
-          req.body.class
-        ).toUpperCase();
-
-
-      if (
-        !CLASS_ORDER.includes(
-          newClass
-        )
-      ) {
-
-        return res.status(400).json({
-          error:
-            "Classe inválida."
-        });
-
-      }
-
-
-      player.class =
-        newClass;
-
-    }
-
-
-    if (
-      req.body.overall !==
-      undefined
-    ) {
-
-      if (
-        req.body.overall ===
-          null ||
-        req.body.overall === ""
-      ) {
-
-        player.overall =
-          null;
-
-      }
-
-      else {
-
-        const overall =
-          Number(
-            req.body.overall
-          );
-
-
-        if (
-          !Number.isFinite(
-            overall
-          ) ||
-          overall < 0 ||
-          overall > 100
-        ) {
-
-          return res.status(400).json({
-            error:
-              "Overall inválido."
-          });
-
-        }
-
-
-        player.overall =
-          overall;
-
-      }
-
-    }
-
-
-    if (
-      req.body.role !== undefined
-    ) {
-
-      const role =
-        String(
-          req.body.role
-        );
-
-
-      if (
-        ![
-          "PLAYER",
-          "ASSIST MANAGER",
-          "MANAGER"
-        ].includes(role)
-      ) {
-
-        return res.status(400).json({
-          error:
-            "Role inválida."
-        });
-
-      }
-
-
-      player.role =
-        role;
-
-    }
-
-
-    normalizePlayerOrder(
-      data.players
-    );
-
-
-    writeData(data);
-
-
-    res.json({
-      success: true,
-      player
+  if (!name) {
+    return res.status(400).json({
+      error: "Informe o nome do time."
     });
-
   }
-);
 
-
-/* =========================
-   TIMES
-   ========================= */
-
-app.post(
-  "/api/admin/teams",
-  requireAdmin,
-  (req, res) => {
-
-    const data =
-      readData();
-
-
-    const name =
-      String(
-        req.body.name || ""
-      ).trim();
-
-
-    if (!name) {
-
-      return res.status(400).json({
-        error:
-          "Nome do time obrigatório."
-      });
-
-    }
-
-
-    const team = {
-
-      id:
-        generateId("team"),
-
-      name,
-
-      logo:
-        String(
-          req.body.logo || ""
-        ).trim(),
-
-      color:
-        String(
-          req.body.color ||
-          "#15151b"
-        ).trim(),
-
-      link:
-        String(
-          req.body.link || ""
-        ).trim(),
-
-      players: []
-
-    };
-
-
-    data.teams.push(
-      team
-    );
-
-
-    writeData(data);
-
-
-    res.json({
-      success: true,
-      team
+  if (
+    DATA.teams.some(
+      team =>
+        team.name.toLowerCase() === name.toLowerCase()
+    )
+  ) {
+    return res.status(400).json({
+      error: "Esse time já existe."
     });
-
   }
-);
 
+  const team = {
+    id: makeId("team"),
+    name,
+    color,
+    logo,
+    players: []
+  };
 
-/* EXCLUIR TIME */
+  DATA.teams.push(team);
+
+  saveData(DATA);
+
+  res.json({
+    success: true,
+    team
+  });
+});
 
 app.delete(
   "/api/admin/teams/:id",
-  requireAdmin,
+  adminOnly,
   (req, res) => {
+    const id = String(req.params.id);
 
-    const data =
-      readData();
+    DATA.players.forEach(player => {
+      if (String(player.teamId) === id) {
+        player.teamId = "";
+        player.freeAgent = true;
+      }
+    });
 
+    DATA.teams = DATA.teams.filter(
+      team => String(team.id) !== id
+    );
 
-    const team =
-      data.teams.find(
-        item =>
-          String(item.id) ===
-          String(req.params.id)
-      );
-
-
-    if (!team) {
-
-      return res.status(404).json({
-        error:
-          "Time não encontrado."
-      });
-
-    }
-
-
-    data.teams =
-      data.teams.filter(
-        item =>
-          String(item.id) !==
-          String(req.params.id)
-      );
-
-
-    /*
-      Jogadores do time
-      viram FREE AGENT.
-    */
-
-    data.players =
-      data.players.map(
-        player => {
-
-          if (
-            String(
-              player.teamId
-            ) ===
-            String(req.params.id)
-          ) {
-
-            return {
-              ...player,
-
-              teamId: null,
-
-              freeAgent: true
-
-            };
-
-          }
-
-
-          return player;
-
-        }
-      );
-
-
-    writeData(data);
-
+    normalizePlayers();
+    saveData(DATA);
 
     res.json({
       success: true
     });
-
   }
 );
 
-
 /* =========================
-   SELEÇÕES
-   ========================= */
+   SELECTIONS
+========================= */
 
 app.post(
   "/api/admin/selections",
-  requireAdmin,
+  adminOnly,
   (req, res) => {
+    const name = clean(req.body.name);
+    const color =
+      clean(req.body.color) || "#b00020";
+    const logo = clean(req.body.logo);
 
-    const data =
-      readData();
+    let playerIds = Array.isArray(req.body.players)
+      ? req.body.players.map(String)
+      : [];
 
-
-    const name =
-      String(
-        req.body.name || ""
-      ).trim();
-
-
-    const players =
-      Array.isArray(
-        req.body.players
-      )
-        ? req.body.players
-        : [];
-
+    playerIds = [...new Set(playerIds)];
 
     if (!name) {
-
       return res.status(400).json({
-        error:
-          "Nome da seleção obrigatório."
+        error: "Informe o nome da seleção."
       });
-
     }
 
-
-    if (
-      players.length > 16
-    ) {
-
+    if (playerIds.length > 16) {
       return res.status(400).json({
         error:
           "Uma seleção pode ter no máximo 16 jogadores."
       });
-
     }
 
-
-    const validPlayers =
-      players.filter(
-        id =>
-          data.players.some(
-            player =>
-              String(player.id) ===
-              String(id)
-          )
-      );
-
-
-    if (
-      validPlayers.length !==
-      players.length
-    ) {
-
-      return res.status(400).json({
-        error:
-          "Um ou mais jogadores não existem."
-      });
-
-    }
-
-
-    const selection = {
-
-      id:
-        generateId("selection"),
-
-      name,
-
-      logo:
-        String(
-          req.body.logo || ""
-        ).trim(),
-
-      color:
-        String(
-          req.body.color ||
-          "#15151b"
-        ).trim(),
-
-      link:
-        String(
-          req.body.link || ""
-        ).trim(),
-
-      players:
-        [...new Set(validPlayers)]
-
-    };
-
-
-    data.selections.push(
-      selection
+    const existingPlayerIds = new Set(
+      DATA.players.map(player => String(player.id))
     );
 
+    const invalid = playerIds.find(
+      id => !existingPlayerIds.has(id)
+    );
 
-    writeData(data);
+    if (invalid) {
+      return res.status(400).json({
+        error: "Um dos jogadores selecionados não existe."
+      });
+    }
 
+    if (
+      DATA.selections.some(
+        selection =>
+          selection.name.toLowerCase() ===
+          name.toLowerCase()
+      )
+    ) {
+      return res.status(400).json({
+        error: "Essa seleção já existe."
+      });
+    }
+
+    const selection = {
+      id: makeId("selection"),
+      name,
+      color,
+      logo,
+      players: playerIds
+    };
+
+    DATA.selections.push(selection);
+
+    saveData(DATA);
 
     res.json({
       success: true,
       selection
     });
-
   }
 );
 
-
-/* EXCLUIR SELEÇÃO */
-
 app.delete(
   "/api/admin/selections/:id",
-  requireAdmin,
+  adminOnly,
   (req, res) => {
+    DATA.selections = DATA.selections.filter(
+      selection =>
+        String(selection.id) !==
+        String(req.params.id)
+    );
 
-    const data =
-      readData();
-
-
-    const before =
-      data.selections.length;
-
-
-    data.selections =
-      data.selections.filter(
-        selection =>
-          String(selection.id) !==
-          String(req.params.id)
-      );
-
-
-    if (
-      data.selections.length ===
-      before
-    ) {
-
-      return res.status(404).json({
-        error:
-          "Seleção não encontrada."
-      });
-
-    }
-
-
-    writeData(data);
-
+    saveData(DATA);
 
     res.json({
       success: true
     });
-
   }
 );
-
 
 /* =========================
-   FALLBACK
-   ========================= */
+   STATIC SITE
+========================= */
 
-app.use(
-  express.static(
-    path.join(
-      __dirname,
-      "public"
-    )
-  )
-);
+app.use(express.static(path.join(__dirname, "public")));
 
+app.use((req, res) => {
+  res.sendFile(
+    path.join(__dirname, "public", "index.html")
+  );
+});
 
-app.use(
-  (req, res) => {
-
-    res.sendFile(
-      path.join(
-        __dirname,
-        "public",
-        "index.html"
-      )
-    );
-
-  }
-);
-
-
-/* =========================
-   INICIAR
-   ========================= */
-
-ensureDataFile();
-
-
-app.listen(
-  PORT,
-  () => {
-
-    console.log(
-      `UTL Site rodando na porta ${PORT}`
-    );
-
-  }
-);
+app.listen(PORT, () => {
+  console.log(
+    `UTL Site rodando na porta ${PORT}`
+  );
+});
