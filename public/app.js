@@ -1,11 +1,11 @@
-alert("APP.JS FOI CARREGADO");
+alert("APP.JS FUNCIONANDO");
 
 document.addEventListener("click", function(e) {
   const botao = e.target.closest("[data-page]");
 
-  if (!botao) return;
-
-  alert("CLIQUEI: " + botao.dataset.page);
+  if (botao) {
+    alert("CLIQUE: " + botao.dataset.page);
+  }
 });
 
 let data = {
