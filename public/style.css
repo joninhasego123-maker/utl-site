@@ -46,19 +46,22 @@ body {
 
 .logo {
   padding: 5px 10px 25px;
+  text-align: center;
+}
+
+.logo img {
+  display: block;
+  width: 82px;
+  height: 82px;
+  object-fit: contain;
+  margin: 0 auto 10px;
 }
 
 .logo span {
   display: block;
-  font-size: 38px;
-  font-weight: 900;
-  color: var(--red);
-  letter-spacing: -2px;
-}
-
-.logo small {
-  color: #777;
+  color: #aaa;
   font-size: 10px;
+  font-weight: 700;
   letter-spacing: 1px;
 }
 
@@ -151,28 +154,30 @@ body {
    ========================= */
 
 .hero {
-  min-height: 360px;
-  border-radius: 18px;
-  background: linear-gradient(
-    120deg,
-    rgba(229,9,20,.85),
-    rgba(40,0,0,.85)
-  );
+  min-height: 400px;
+  border-radius: 20px;
+  background:
+    radial-gradient(
+      circle at 80% 50%,
+      rgba(229,9,20,.35),
+      transparent 35%
+    ),
+    linear-gradient(
+      120deg,
+      #500005,
+      #160000 60%,
+      #080808
+    );
+
   display: flex;
   align-items: center;
+  justify-content: center;
+
   padding: 45px;
+
   overflow: hidden;
   position: relative;
-}
-
-.hero::after {
-  content: "UTL";
-  position: absolute;
-  right: 30px;
-  bottom: -50px;
-  font-size: 220px;
-  font-weight: 900;
-  opacity: .06;
+  text-align: center;
 }
 
 .hero-content {
@@ -180,23 +185,21 @@ body {
   z-index: 2;
 }
 
-.hero-tag {
-  display: inline-block;
-  background: rgba(255,255,255,.12);
-  padding: 6px 10px;
-  border-radius: 7px;
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 15px;
+.hero-logo {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  margin-bottom: 20px;
 }
 
 .hero h1 {
   font-size: 42px;
   margin-bottom: 10px;
+  font-weight: 900;
 }
 
 .hero p {
-  color: #ddd;
+  color: #ccc;
 }
 
 /* =========================
@@ -229,47 +232,115 @@ body {
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(250px, 1fr)
+  );
   gap: 18px;
-}
-
-/* =========================
-   LINKS
-   ========================= */
-
-.links-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 18px;
-}
-
-.link-card {
-  display: block;
-  text-decoration: none;
-  color: #fff;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 22px;
-  transition: .2s;
-}
-
-.link-card:hover {
-  border-color: rgba(229,9,20,.5);
-  transform: translateY(-2px);
-}
-
-.link-card h3 {
-  margin-bottom: 7px;
-}
-
-.link-card p {
-  color: #777;
-  font-size: 13px;
 }
 
 /* =========================
    NEWS
+   ========================= */
+
+.news-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.news-category {
+  background: #101010;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.news-category-header {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  background: #181818;
+  border: 0;
+
+  color: #fff;
+  cursor: pointer;
+
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.news-category-header:hover {
+  background: #202020;
+}
+
+.news-category-header small {
+  color: #777;
+  margin-left: 8px;
+  font-weight: 400;
+}
+
+.news-category-arrow {
+  color: #aaa;
+  font-size: 18px;
+}
+
+.news-category-content {
+  padding: 15px;
+}
+
+.news-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.news-card {
+  overflow: hidden;
+  background: #141414;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 14px;
+}
+
+.news-card img {
+  display: block;
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+}
+
+.news-card-content {
+  padding: 18px;
+}
+
+.news-card-category {
+  display: inline-block;
+  color: #ff5a60;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.news-card-content h3 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.news-card-content p {
+  color: #999;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+/* =========================
+   NEWS FILTER
    ========================= */
 
 .news-filters {
@@ -295,40 +366,6 @@ body {
   border-color: var(--red);
 }
 
-.news-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-}
-
-.news-card {
-  overflow: hidden;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-}
-
-.news-card img {
-  display: block;
-  width: 100%;
-  height: 190px;
-  object-fit: cover;
-}
-
-.news-card-content {
-  padding: 18px;
-}
-
-.news-card-content h3 {
-  margin-bottom: 8px;
-}
-
-.news-card-content p {
-  color: #999;
-  line-height: 1.5;
-  font-size: 14px;
-}
-
 /* =========================
    JOGADORES
    ========================= */
@@ -348,18 +385,19 @@ body {
   margin-bottom: 0;
 }
 
-/* Categoria */
-
 .player-class-header {
   width: 100%;
   min-height: 54px;
   padding: 0 18px;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   background: #181818;
   border: 1px solid rgba(255,255,255,.08);
   border-radius: 14px;
+
   color: #fff;
   cursor: pointer;
   transition: .2s;
@@ -379,8 +417,6 @@ body {
   color: #aaa;
 }
 
-/* Área aberta */
-
 .player-class-content {
   margin-top: 6px;
   background: #0b0b0b;
@@ -389,19 +425,23 @@ body {
   border-radius: 10px;
 }
 
-/* Cabeçalho da tabela */
+/* =========================
+   TABELA DOS JOGADORES
+   ID | NICK | CLASS | TEAM |
+   ROLE | OVERALL | WAGE
+   ========================= */
 
 .players-table-head {
   display: grid;
 
   grid-template-columns:
+    85px
+    minmax(150px, 1.4fr)
     80px
-    minmax(150px, 1.5fr)
-    80px
-    minmax(150px, 1.5fr)
-    minmax(140px, 1fr)
-    100px
-    80px;
+    minmax(150px, 1.4fr)
+    minmax(145px, 1fr)
+    90px
+    100px;
 
   align-items: center;
 
@@ -419,22 +459,20 @@ body {
 
   text-transform: uppercase;
 
-  min-width: 850px;
+  min-width: 920px;
 }
-
-/* Linha do jogador */
 
 .player-row {
   display: grid;
 
   grid-template-columns:
+    85px
+    minmax(150px, 1.4fr)
     80px
-    minmax(150px, 1.5fr)
-    80px
-    minmax(150px, 1.5fr)
-    minmax(140px, 1fr)
-    100px
-    80px;
+    minmax(150px, 1.4fr)
+    minmax(145px, 1fr)
+    90px
+    100px;
 
   align-items: center;
 
@@ -446,7 +484,7 @@ body {
 
   border-top: 1px solid rgba(255,255,255,.05);
 
-  min-width: 850px;
+  min-width: 920px;
 }
 
 .player-row:hover {
@@ -462,28 +500,24 @@ body {
   white-space: nowrap;
 }
 
-/* Nick */
+/* NICK */
 
 .player-nick {
   font-weight: 600;
   color: #fff;
-
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Classe */
+/* CLASS */
 
 .class-badge {
   display: inline-flex;
-
   align-items: center;
   justify-content: center;
 
   min-width: 42px;
-
-  width: fit-content;
 
   padding: 5px 10px;
 
@@ -542,13 +576,11 @@ body {
   border: 1px solid rgba(150,150,150,.22);
 }
 
-/* Time */
+/* TEAM */
 
 .team-cell {
   display: flex;
-
   align-items: center;
-
   gap: 8px;
 
   color: #ccc;
@@ -565,13 +597,9 @@ body {
   flex-shrink: 0;
 }
 
-/* Free Agent */
-
 .free-agent {
   display: flex;
-
   align-items: center;
-
   gap: 6px;
 
   color: #ccc;
@@ -579,81 +607,32 @@ body {
   white-space: nowrap;
 }
 
-/* Role */
+/* ROLE */
 
 .player-role {
   color: #ccc;
-
   font-size: 13px;
-
   white-space: nowrap;
 }
 
-/* Wage */
+/* OVERALL */
+
+.player-overall {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* WAGE */
 
 .player-wage {
+  color: #fff;
   font-weight: 700;
-
-  color: #fff;
-
   white-space: nowrap;
-}
-
-/* Setas */
-
-.player-order-actions {
-  display: flex;
-
-  align-items: center;
-
-  justify-content: center;
-
-  gap: 5px;
-}
-
-.player-move-button {
-  width: 30px;
-  height: 30px;
-
-  border: 1px solid rgba(255,255,255,.1);
-
-  border-radius: 7px;
-
-  background: #191919;
-
-  color: #fff;
-
-  cursor: pointer;
-
-  font-size: 14px;
-
-  transition: .15s;
-}
-
-.player-move-button:hover {
-  background: #252525;
-
-  border-color: rgba(229,9,20,.45);
-
-  color: #fff;
-}
-
-/* Jogador vazio */
-
-.player-empty {
-  min-width: 850px;
-
-  padding: 25px;
-
-  text-align: center;
-
-  color: #666;
-
-  font-size: 13px;
 }
 
 /* =========================
-   SELEÇÕES / TIMES
+   TIMES E SELEÇÕES
    ========================= */
 
 .selection-grid,
@@ -668,42 +647,75 @@ body {
 
 .selection-card,
 .team-card {
-  background: var(--panel);
+  position: relative;
 
-  border: 1px solid var(--border);
+  min-height: 230px;
 
-  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.1);
 
-  padding: 18px;
+  border-radius: 18px;
+
+  padding: 22px;
+
+  overflow: hidden;
+
+  background: #151515;
 
   transition: .2s;
 }
 
 .selection-card:hover,
 .team-card:hover {
-  border-color: rgba(229,9,20,.4);
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.25);
 }
 
 .selection-card img,
 .team-card img {
-  width: 70px;
-  height: 70px;
+  width: 80px;
+  height: 80px;
 
   object-fit: contain;
 
-  margin-bottom: 12px;
+  margin-bottom: 15px;
 }
 
 .selection-card h3,
 .team-card h3 {
-  margin-bottom: 5px;
+  font-size: 20px;
+  margin-bottom: 7px;
 }
 
 .selection-card p,
 .team-card p {
-  color: #777;
+  color: rgba(255,255,255,.65);
+  font-size: 13px;
+}
+
+.team-card a,
+.selection-card a {
+  display: inline-block;
+
+  margin-top: 14px;
+
+  color: #fff;
+
+  text-decoration: none;
 
   font-size: 13px;
+
+  font-weight: 700;
+}
+
+.team-card a:hover,
+.selection-card a:hover {
+  color: #ff5a60;
+}
+
+.team-player-count {
+  margin-top: 10px;
+  color: rgba(255,255,255,.7);
+  font-size: 12px;
 }
 
 /* =========================
@@ -726,9 +738,13 @@ body {
   margin-bottom: 18px;
 }
 
+.admin-section > p {
+  color: #777;
+  margin-bottom: 15px;
+}
+
 .admin-form {
   display: grid;
-
   gap: 12px;
 }
 
@@ -754,7 +770,6 @@ body {
 
 .admin-form textarea {
   min-height: 100px;
-
   resize: vertical;
 }
 
@@ -806,17 +821,13 @@ body {
 
 .admin-list {
   display: flex;
-
   flex-direction: column;
-
   gap: 8px;
 }
 
 .admin-list-item {
   display: flex;
-
   align-items: center;
-
   justify-content: space-between;
 
   gap: 15px;
@@ -947,7 +958,7 @@ body {
 }
 
 /* =========================
-   TABLE / IFRAME
+   TABELA
    ========================= */
 
 .table-container {
@@ -971,6 +982,22 @@ body {
 }
 
 /* =========================
+   EMPTY
+   ========================= */
+
+.player-empty {
+  min-width: 920px;
+
+  padding: 25px;
+
+  text-align: center;
+
+  color: #666;
+
+  font-size: 13px;
+}
+
+/* =========================
    SCROLLBAR
    ========================= */
 
@@ -985,7 +1012,6 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: #292929;
-
   border-radius: 10px;
 }
 
@@ -1040,9 +1066,13 @@ body {
   }
 
   .hero {
-    min-height: 300px;
-
+    min-height: 330px;
     padding: 30px;
+  }
+
+  .hero-logo {
+    width: 110px;
+    height: 110px;
   }
 
   .hero h1 {
@@ -1054,28 +1084,30 @@ body {
   }
 
   .cards-grid,
-  .links-grid,
   .news-grid,
   .selection-grid,
   .team-grid {
     grid-template-columns: 1fr;
   }
 
-  /* Tabela de jogadores continua horizontal,
-     permitindo arrastar para os lados */
+  /*
+    Jogadores ficam em tabela horizontal
+    para NÃO quebrar ID, NICK, CLASS, TEAM,
+    ROLE, OVERALL e WAGE.
+  */
 
   .players-table-head,
   .player-row {
     grid-template-columns:
-      60px
+      70px
       140px
       70px
       140px
-      130px
-      90px
-      75px;
+      135px
+      80px
+      90px;
 
-    min-width: 705px;
+    min-width: 825px;
 
     padding: 0 10px;
   }
@@ -1085,7 +1117,11 @@ body {
   }
 
   .player-nick,
-  .player-role,
+  .player-role {
+    font-size: 12px;
+  }
+
+  .player-overall,
   .player-wage {
     font-size: 12px;
   }
@@ -1099,14 +1135,8 @@ body {
     height: 22px;
   }
 
-  .player-move-button {
-    width: 27px;
-    height: 27px;
-  }
-
   .admin-list-item {
     align-items: flex-start;
-
     flex-direction: column;
   }
 }
