@@ -1,13 +1,3 @@
-alert("APP.JS FUNCIONANDO");
-
-document.addEventListener("click", function(e) {
-  const botao = e.target.closest("[data-page]");
-
-  if (botao) {
-    alert("CLIQUE: " + botao.dataset.page);
-  }
-});
-
 let data = {
   links: {},
   tableUrl: "",
@@ -2432,5 +2422,3 @@ if (modal) {
   await checkAdmin();
   await loadData();
 })();
-
-alert("APP.JS FUNCIONANDO");
