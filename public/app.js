@@ -606,6 +606,7 @@ function bindPlayerGroups() {
 
 function renderClubsPage(type) {
   const isTeam = type === "team";
+
   const clubs = isTeam
     ? state.data?.teams || []
     : state.data?.selections || [];
@@ -618,10 +619,12 @@ function renderClubsPage(type) {
     <div class="page-head">
       <div>
         <h1>${isTeam ? "Times" : "Seleções"}</h1>
+
         <p>
-          ${isTeam
-            ? "Confira os times participantes da UTL."
-            : "Confira as seleções cadastradas na competição."
+          ${
+            isTeam
+              ? "Confira os times participantes da UTL."
+              : "Confira as seleções cadastradas na competição."
           }
         </p>
       </div>
@@ -638,8 +641,13 @@ function renderClubsPage(type) {
         `
         : `
           <div class="empty-state">
-            <strong>Nenhum ${isTeam ? "time" : "seleção"} cadastrado</strong>
-            <span>A administração ainda não adicionou nenhum item.</span>
+            <strong>
+              Nenhum ${isTeam ? "time" : "seleção"} cadastrado
+            </strong>
+
+            <span>
+              A administração ainda não adicionou nenhum item.
+            </span>
           </div>
         `
     }
@@ -661,13 +669,18 @@ function renderClubCard(club, type) {
       </span>
     `;
 
-  const players = type === "team"
-    ? (state.data.players || []).filter(
-        player => String(player.teamId) === String(club.id)
-      )
-    : (club.players || [])
-        .map(id => getPlayer(id))
-        .filter(Boolean);
+  let players = [];
+
+  if (type === "team") {
+    players = (state.data?.players || []).filter(
+      player =>
+        String(player.teamId) === String(club.id)
+    );
+  } else {
+    players = (club.players || [])
+      .map(id => getPlayer(id))
+      .filter(Boolean);
+  }
 
   return `
     <article
@@ -681,7 +694,10 @@ function renderClubCard(club, type) {
 
       <div class="club-info">
         <strong>${escapeHTML(club.name)}</strong>
-        <span>${players.length}/16 jogadores</span>
+
+        <span>
+          ${players.length}/16 jogadores
+        </span>
       </div>
 
       <span class="club-arrow">›</span>
@@ -689,14 +705,106 @@ function renderClubCard(club, type) {
   `;
 }
 
+/* =========================================================
+   PLAYER TABLE FOR TEAM / SELECTION
+   ========================================================= */
+
+function sortClubPlayers(players) {
+  return [...players].sort((a, b) => {
+    const classA = CLASS_ORDER.indexOf(
+      formatClass(a.class)
+    );
+
+    const classB = CLASS_ORDER.indexOf(
+      formatClass(b.class)
+    );
+
+    /*
+      Primeiro ordena pela classe:
+
+      X
+      S+
+      S
+      S-
+      A+
+      A
+      A-
+      B+
+      B
+      B-
+      C+
+      C
+      C-
+      D
+
+      Se a classe for igual, mantém a ordem original.
+    */
+
+    return classA - classB;
+  });
+}
+
+function renderClubPlayerTable(players) {
+  const sorted = sortClubPlayers(players);
+
+  return `
+    <div style="overflow-x:auto;">
+      <div class="players-table">
+
+        <div class="players-table-head">
+          <span>NICK</span>
+          <span>CLASS</span>
+          <span>OVERALL</span>
+          <span>WAGE</span>
+        </div>
+
+        ${sorted.map(player => {
+          const cls = formatClass(player.class);
+          const base = classBase(cls);
+
+          return `
+            <div class="player-row">
+
+              <span class="player-nick">
+                ${escapeHTML(player.nick)}
+              </span>
+
+              <span>
+                <span class="class-badge class-${base}">
+                  ${escapeHTML(cls)}
+                </span>
+              </span>
+
+              <span>
+                ${escapeHTML(player.overall)}
+              </span>
+
+              <span>
+                ${formatMoney(player.wage)}
+              </span>
+
+            </div>
+          `;
+        }).join("")}
+
+      </div>
+    </div>
+  `;
+}
+
+/* =========================================================
+   TEAM / SELECTION DETAIL
+   ========================================================= */
+
 function renderClubDetail(type, club) {
   const isTeam = type === "team";
 
-  let players;
+  let players = [];
 
   if (isTeam) {
-    players = (state.data.players || []).filter(
-      player => String(player.teamId) === String(club.id)
+    players = (state.data?.players || []).filter(
+      player =>
+        String(player.teamId) === String(club.id)
     );
   } else {
     players = (club.players || [])
@@ -721,7 +829,11 @@ function renderClubDetail(type, club) {
   return `
     <div class="club-detail">
 
-      <button class="back-btn" id="clubBack" type="button">
+      <button
+        class="back-btn"
+        id="clubBack"
+        type="button"
+      >
         ← Voltar
       </button>
 
@@ -733,6 +845,7 @@ function renderClubDetail(type, club) {
 
         <div>
           <h1>${escapeHTML(club.name)}</h1>
+
           <p>
             ${players.length}/16 jogadores
           </p>
@@ -740,45 +853,48 @@ function renderClubDetail(type, club) {
       </div>
 
       <div class="club-detail-players">
+
         ${
           players.length
-            ? `
-              <div class="players-groups">
-                ${CLASS_GROUPS.map(group =>
-                  renderPlayerClassGroup(
-                    group.name,
-                    group.classes,
-                    players
-                  )
-                ).join("")}
-              </div>
-            `
+            ? renderClubPlayerTable(players)
             : `
               <div class="empty-state">
                 <strong>Elenco vazio</strong>
-                <span>Nenhum jogador foi atribuído a este ${isTeam ? "time" : "seleção"}.</span>
+
+                <span>
+                  Nenhum jogador foi atribuído a este
+                  ${isTeam ? "time" : "seleção"}.
+                </span>
               </div>
             `
         }
+
       </div>
+
     </div>
   `;
 }
 
 function bindClubCards() {
   if (state.detail) {
-    $("#clubBack")?.addEventListener("click", () => {
-      state.detail = null;
-      renderPage();
-      bindClubCards();
-    });
 
-    bindPlayerGroups();
+    $("#clubBack")?.addEventListener(
+      "click",
+      () => {
+        state.detail = null;
+
+        renderPage();
+        bindClubCards();
+      }
+    );
+
     return;
   }
 
   document.querySelectorAll(".club-card").forEach(card => {
+
     card.addEventListener("click", () => {
+
       const type =
         state.page === "teams"
           ? "team"
@@ -786,16 +902,19 @@ function bindClubCards() {
 
       const clubs =
         type === "team"
-          ? state.data.teams || []
-          : state.data.selections || [];
+          ? state.data?.teams || []
+          : state.data?.selections || [];
 
       state.detail = clubs.find(
-        club => String(club.id) === String(card.dataset.clubId)
+        club =>
+          String(club.id) ===
+          String(card.dataset.clubId)
       );
 
       renderPage();
       bindClubCards();
     });
+
   });
 }
 
