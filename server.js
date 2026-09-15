@@ -6,6 +6,9 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// IMPORTANTE PARA O RENDER
+app.set("trust proxy", 1);
+
 const DATA_FILE = path.join(__dirname, "data.json");
 
 const ADMIN_PASSWORD =
@@ -77,6 +80,7 @@ const ROLES = [
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// SESSÃO
 app.use(
   session({
     secret: SESSION_SECRET,
@@ -370,13 +374,13 @@ function normalizeSelection(selection) {
 ========================= */
 
 function adminOnly(req, res, next) {
-  if (!req.session.admin) {
-    return res.status(401).json({
-      error: "Não autorizado."
-    });
+  if (req.session && req.session.admin === true) {
+    return next();
   }
 
-  next();
+  return res.status(401).json({
+    error: "Não autorizado."
+  });
 }
 
 function generateId(prefix) {
@@ -433,6 +437,7 @@ app.get(
   (req, res) => {
     res.json({
       authenticated:
+        req.session &&
         req.session.admin === true
     });
   }
@@ -458,8 +463,25 @@ app.post(
 
     req.session.admin = true;
 
-    res.json({
-      success: true
+    // Garante que a sessão foi salva
+    // antes de responder ao navegador.
+    req.session.save(err => {
+      if (err) {
+        console.error(
+          "Erro ao salvar sessão:",
+          err
+        );
+
+        return res.status(500).json({
+          error:
+            "Não foi possível salvar a sessão."
+        });
+      }
+
+      res.json({
+        success: true,
+        authenticated: true
+      });
     });
   }
 );
@@ -467,7 +489,14 @@ app.post(
 app.post(
   "/api/admin/logout",
   (req, res) => {
-    req.session.destroy(() => {
+    req.session.destroy(err => {
+      if (err) {
+        return res.status(500).json({
+          error:
+            "Não foi possível encerrar a sessão."
+        });
+      }
+
       res.json({
         success: true
       });
@@ -1196,6 +1225,10 @@ app.use(
     );
   }
 );
+
+/* =========================
+   START
+========================= */
 
 app.listen(
   PORT,
