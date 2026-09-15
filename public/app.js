@@ -1,5 +1,9 @@
-const $ = (selector, root = document) => root.querySelector(selector);
-const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const state = {
+  data: null,
+  admin: false,
+  page: "news",
+  detail: null
+};
 
 const CLASS_ORDER = [
   "X",
@@ -18,31 +22,32 @@ const CLASS_ORDER = [
   "D"
 ];
 
-const CLASS_GROUPS = ["X", "S", "A", "B", "C", "D"];
+const CLASS_GROUPS = [
+  { name: "CLASS X", classes: ["X"] },
+  { name: "CLASS S", classes: ["S+", "S", "S-"] },
+  { name: "CLASS A", classes: ["A+", "A", "A-"] },
+  { name: "CLASS B", classes: ["B+", "B", "B-"] },
+  { name: "CLASS C", classes: ["C+", "C", "C-"] },
+  { name: "CLASS D", classes: ["D"] }
+];
 
 const FIXED_WAGES = {
-  "S+": "350K",
-  "S": "325K",
-  "S-": "300K",
-  "A+": "275K",
-  "A": "250K",
-  "A-": "200K",
-  "B+": "175K",
-  "B": "150K",
-  "B-": "125K",
-  "C+": "100K",
-  "C": "90K",
-  "C-": "85K",
-  "D": "75K"
+  D: 75000,
+  "C-": 85000,
+  C: 90000,
+  "C+": 100000,
+  "B-": 125000,
+  B: 150000,
+  "B+": 175000,
+  "A-": 200000,
+  A: 250000,
+  "A+": 275000,
+  "S-": 300000,
+  S: 325000,
+  "S+": 350000
 };
 
-const X_WAGES = {
-  380000: "380K",
-  385000: "385K",
-  390000: "390K",
-  395000: "395K",
-  400000: "400K"
-};
+const X_WAGES = [380000, 385000, 390000, 395000, 400000];
 
 const ROLE_OPTIONS = [
   "PLAYER",
@@ -50,144 +55,133 @@ const ROLE_OPTIONS = [
   "MANAGER"
 ];
 
-let DATA = {
-  links: {
-    discord: "",
-    tiktok: "",
-    tabela: ""
-  },
-  newsCategories: ["Geral"],
-  news: [],
-  players: [],
-  selections: [],
-  teams: []
-};
-
-let isAdmin = false;
-let currentPage = "news";
-let currentClubType = null;
-let currentClubId = null;
-
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function playerClass(player) {
-  return String(player?.class || "D").toUpperCase();
-}
-
-function baseClass(className) {
-  return className === "X" ? "X" : className.charAt(0);
-}
-
-function playerWage(player) {
-  const cls = playerClass(player);
-
-  if (cls === "X") {
-    return X_WAGES[Number(player.wage)] || "380K";
-  }
-
-  return FIXED_WAGES[cls] || "—";
-}
-
-function getTeam(teamId) {
-  return DATA.teams.find(team => String(team.id) === String(teamId));
-}
-
-function getSelection(selectionId) {
-  return DATA.selections.find(
-    selection => String(selection.id) === String(selectionId)
-  );
-}
-
-function getPlayerTeam(player) {
-  if (!player?.teamId) return null;
-  return getTeam(player.teamId);
-}
-
-function formatImage(url, fallback = "") {
-  return url || fallback;
-}
-
-function toast(message) {
-  const el = $("#toast");
-
-  if (!el) return;
-
-  el.textContent = message;
-  el.classList.add("show");
-
-  clearTimeout(toast.timer);
-
-  toast.timer = setTimeout(() => {
-    el.classList.remove("show");
-  }, 3000);
-}
+const $ = (selector) => document.querySelector(selector);
 
 async function api(url, options = {}) {
   const response = await fetch(url, {
     credentials: "same-origin",
-    ...options,
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {})
-    }
+    },
+    ...options
   });
 
-  let data = {};
+  let result = {};
 
   try {
-    data = await response.json();
+    result = await response.json();
   } catch {
-    data = {};
+    result = {};
   }
 
   if (!response.ok) {
-    throw new Error(data.error || "Ocorreu um erro.");
+    throw new Error(result.error || "Ocorreu um erro.");
   }
 
-  return data;
+  return result;
 }
 
-async function loadData() {
-  try {
-    const result = await api("/api/data");
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
-    DATA = {
-      links: {
-        discord: "",
-        tiktok: "",
-        tabela: "",
-        ...(result.links || {})
-      },
-      newsCategories:
-        Array.isArray(result.newsCategories) && result.newsCategories.length
-          ? result.newsCategories
-          : ["Geral"],
-      news: Array.isArray(result.news) ? result.news : [],
-      players: Array.isArray(result.players) ? result.players : [],
-      selections: Array.isArray(result.selections)
-        ? result.selections
-        : [],
-      teams: Array.isArray(result.teams) ? result.teams : []
-    };
-  } catch (error) {
-    toast(error.message);
-  }
+function formatMoney(value) {
+  const number = Number(value || 0);
+
+  return number.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0
+  });
+}
+
+function formatClass(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function classBase(value) {
+  const cls = formatClass(value);
+
+  if (cls === "X") return "X";
+  if (cls.startsWith("S")) return "S";
+  if (cls.startsWith("A")) return "A";
+  if (cls.startsWith("B")) return "B";
+  if (cls.startsWith("C")) return "C";
+  return "D";
+}
+
+function getTeam(id) {
+  if (!state.data?.teams) return null;
+
+  return state.data.teams.find(
+    team => String(team.id) === String(id)
+  ) || null;
+}
+
+function getPlayer(id) {
+  if (!state.data?.players) return null;
+
+  return state.data.players.find(
+    player => String(player.id) === String(id)
+  ) || null;
+}
+
+function playerTeam(player) {
+  return getTeam(player.teamId);
+}
+
+function sortedPlayers(players) {
+  return [...players].sort((a, b) => {
+    const classA = CLASS_ORDER.indexOf(formatClass(a.class));
+    const classB = CLASS_ORDER.indexOf(formatClass(b.class));
+
+    if (classA !== classB) {
+      return classA - classB;
+    }
+
+    return Number(a.id) - Number(b.id);
+  });
+}
+
+function showToast(message) {
+  const toast = $("#toast");
+
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.classList.add("show");
+
+  clearTimeout(showToast.timer);
+
+  showToast.timer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2800);
 }
 
 function setPageTitle(title) {
-  const titleEl = $("#page-title");
-  if (titleEl) titleEl.textContent = title;
+  const element = $("#page-title");
+
+  if (element) {
+    element.textContent = title;
+  }
 }
 
-function setActiveNav(page) {
-  $$(".nav").forEach(button => {
+function closeMobileMenu() {
+  $("#sidebar")?.classList.remove("open");
+}
+
+function openMobileMenu() {
+  $("#sidebar")?.classList.toggle("open");
+}
+
+function updateActiveNav(page) {
+  document.querySelectorAll(".nav").forEach(button => {
     button.classList.toggle(
       "active",
       button.dataset.page === page
@@ -195,21 +189,51 @@ function setActiveNav(page) {
   });
 }
 
-function renderPage(page) {
-  currentPage = page;
+/* =========================================================
+   LOAD
+   ========================================================= */
 
-  if (page === "table") {
-    showExternalConfirm(DATA.links?.tabela);
-    return;
+async function loadData() {
+  try {
+    const result = await api("/api/data");
+
+    state.data = result.data || result;
+
+    render();
+  } catch (error) {
+    showToast(error.message);
   }
+}
 
-  currentClubType = null;
-  currentClubId = null;
+async function loadAdminStatus() {
+  try {
+    const result = await api("/api/admin/status");
 
-  setActiveNav(page);
+    state.admin = Boolean(
+      result.authenticated ??
+      result.admin ??
+      result.loggedIn
+    );
+  } catch {
+    state.admin = false;
+  }
+}
+
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
+
+function navigate(page) {
+  state.page = page;
+  state.detail = null;
+
+  closeMobileMenu();
+
+  updateActiveNav(page);
 
   const titles = {
     news: "News",
+    table: "Tabela",
     players: "Jogadores",
     selections: "Seleções",
     teams: "Times",
@@ -218,23 +242,178 @@ function renderPage(page) {
 
   setPageTitle(titles[page] || "News");
 
-  if (page === "news") renderNews();
-  if (page === "players") renderPlayers();
-  if (page === "selections") renderClubs("selection");
-  if (page === "teams") renderClubs("team");
-  if (page === "admin") renderAdmin();
-
-  $("#sidebar")?.classList.remove("mobile-open");
+  renderPage();
 }
 
-function showExternalConfirm(url) {
-  const old = $("#externalConfirm");
+function render() {
+  updateActiveNav(state.page);
+  renderPage();
+}
 
-  if (old) old.remove();
+function renderPage() {
+  const content = $("#page-content");
+
+  if (!content) return;
+
+  if (state.page === "news") {
+    setPageTitle("News");
+    content.innerHTML = renderNews();
+    bindNews();
+    return;
+  }
+
+  if (state.page === "table") {
+    setPageTitle("Tabela");
+    renderTableRedirect();
+    return;
+  }
+
+  if (state.page === "players") {
+    setPageTitle("Jogadores");
+    content.innerHTML = renderPlayersPage();
+    bindPlayerGroups();
+    return;
+  }
+
+  if (state.page === "selections") {
+    setPageTitle("Seleções");
+    content.innerHTML = renderClubsPage("selection");
+    bindClubCards();
+    return;
+  }
+
+  if (state.page === "teams") {
+    setPageTitle("Times");
+    content.innerHTML = renderClubsPage("team");
+    bindClubCards();
+    return;
+  }
+
+  if (state.page === "admin") {
+    setPageTitle("Admin Area");
+    content.innerHTML = renderAdmin();
+    bindAdmin();
+  }
+}
+
+/* =========================================================
+   NEWS
+   ========================================================= */
+
+function renderNews() {
+  const categories = state.data?.newsCategories || ["Geral"];
+  const news = state.data?.news || [];
+
+  const orderedCategories = [
+    "Geral",
+    ...categories.filter(
+      category => category !== "Geral"
+    )
+  ];
+
+  const groups = orderedCategories.map(category => {
+    const items = news.filter(
+      item => (item.category || "Geral") === category
+    );
+
+    return `
+      <section class="news-category">
+        <div class="news-category-header">
+          <strong>${escapeHTML(category)}</strong>
+        </div>
+
+        <div class="news-category-content">
+          ${
+            items.length
+              ? items.map(renderNewsCard).join("")
+              : `
+                <div class="empty-state">
+                  <strong>Nenhuma notícia</strong>
+                  <span>Esta categoria ainda não possui notícias.</span>
+                </div>
+              `
+          }
+        </div>
+      </section>
+    `;
+  }).join("");
+
+  return `
+    <div class="page-head">
+      <div>
+        <h1>News</h1>
+        <p>Confira as últimas notícias da ULTIMATE TCS LEAGUE.</p>
+      </div>
+    </div>
+
+    <div class="news-list">
+      ${groups}
+    </div>
+  `;
+}
+
+function renderNewsCard(item) {
+  const image = item.image
+    ? `<img class="news-image" src="${escapeHTML(item.image)}" alt="">`
+    : `<div class="news-image"></div>`;
+
+  return `
+    <article class="news-card">
+      ${image}
+
+      <div class="news-card-body">
+        <h3>${escapeHTML(item.title)}</h3>
+        <p>${escapeHTML(item.description)}</p>
+      </div>
+    </article>
+  `;
+}
+
+function bindNews() {
+  document.querySelectorAll(".news-category-header").forEach(header => {
+    header.addEventListener("click", () => {
+      header.parentElement.classList.toggle("open");
+    });
+  });
+}
+
+/* =========================================================
+   TABLE REDIRECT
+   ========================================================= */
+
+function renderTableRedirect() {
+  const content = $("#page-content");
+
+  content.innerHTML = `
+    <div class="page-head">
+      <div>
+        <h1>Tabela</h1>
+        <p>A tabela oficial da competição está disponível em outro site.</p>
+      </div>
+    </div>
+
+    <div class="empty-state">
+      <strong>Abrindo tabela externa</strong>
+      <span>Você será direcionado para o site configurado pela administração.</span>
+    </div>
+  `;
+
+  setTimeout(() => {
+    openTableModal();
+  }, 100);
+}
+
+function openTableModal() {
+  const url = state.data?.links?.tabela;
+
+  if (!url) {
+    showToast("A tabela ainda não foi configurada.");
+    navigate("news");
+    return;
+  }
 
   const overlay = document.createElement("div");
 
-  overlay.id = "externalConfirm";
   overlay.className = "modal-overlay";
 
   overlay.innerHTML = `
@@ -242,271 +421,145 @@ function showExternalConfirm(url) {
       <h2>Você está sendo levado a outro site</h2>
 
       <p>
-        A tabela da ULTIMATE TCS LEAGUE será aberta em um
-        site externo. Você deseja continuar?
+        Ao continuar, você sairá do site da ULTIMATE TCS LEAGUE
+        e será direcionado para a página externa da tabela.
       </p>
 
       <div class="modal-actions">
-        <button class="btn secondary" data-external-no>Não</button>
-        <button class="btn primary" data-external-yes>Sim</button>
+        <button class="btn secondary" id="tableNo">
+          Não
+        </button>
+
+        <button class="btn primary" id="tableYes">
+          Sim
+        </button>
       </div>
     </div>
   `;
 
   document.body.appendChild(overlay);
 
-  $("[data-external-no]", overlay)?.addEventListener(
-    "click",
-    () => overlay.remove()
-  );
+  $("#tableNo")?.addEventListener("click", () => {
+    overlay.remove();
+    navigate("news");
+  });
 
-  $("[data-external-yes]", overlay)?.addEventListener(
-    "click",
-    () => {
-      if (!url) {
-        overlay.remove();
-        toast("O link da tabela ainda não foi configurado.");
-        return;
-      }
-
-      window.location.href = url;
-    }
-  );
+  $("#tableYes")?.addEventListener("click", () => {
+    window.location.href = url;
+  });
 
   overlay.addEventListener("click", event => {
     if (event.target === overlay) {
       overlay.remove();
+      navigate("news");
     }
   });
 }
 
-function renderNews() {
-  const content = $("#page-content");
+/* =========================================================
+   PLAYERS
+   ========================================================= */
 
-  if (!content) return;
-
-  const categories = DATA.newsCategories?.length
-    ? DATA.newsCategories
-    : ["Geral"];
-
-  content.innerHTML = `
-    <div class="page-head">
-      <div>
-        <h1>News</h1>
-        <p>Últimas notícias da ULTIMATE TCS LEAGUE</p>
-      </div>
-    </div>
-
-    <div class="news-list">
-      ${categories.map(category => {
-        const categoryNews = DATA.news.filter(
-          item => (item.category || "Geral") === category
-        );
-
-        return `
-          <section class="news-category">
-            <button
-              class="news-category-header"
-              data-news-category="${escapeHTML(category)}"
-            >
-              <span>${escapeHTML(category)}</span>
-              <span>⌄</span>
-            </button>
-
-            <div class="news-category-content">
-              ${
-                categoryNews.length
-                  ? categoryNews
-                      .map(renderNewsCard)
-                      .join("")
-                  : `
-                    <div class="empty-state">
-                      Nenhuma notícia nesta categoria.
-                    </div>
-                  `
-              }
-            </div>
-          </section>
-        `;
-      }).join("")}
-    </div>
-  `;
-
-  $$(".news-category-header", content).forEach(button => {
-    button.addEventListener("click", () => {
-      button.classList.toggle("open");
-
-      const box = button.nextElementSibling;
-
-      if (box) {
-        box.classList.toggle("open");
-      }
-    });
-  });
-}
-
-function renderNewsCard(news) {
+function renderPlayersPage(players = state.data?.players || []) {
   return `
-    <article class="news-card">
-      ${
-        news.image
-          ? `
-            <img
-              src="${escapeHTML(news.image)}"
-              alt=""
-              class="news-image"
-              onerror="this.style.display='none'"
-            >
-          `
-          : ""
-      }
-
-      <div class="news-card-body">
-        <h3>${escapeHTML(news.title)}</h3>
-
-        <p>
-          ${escapeHTML(news.description)}
-        </p>
-      </div>
-    </article>
-  `;
-}
-
-function renderPlayers(players = DATA.players, options = {}) {
-  const content = $("#page-content");
-
-  if (!content) return;
-
-  const detail = Boolean(options.detail);
-  const openCategories = Boolean(options.openCategories);
-
-  const groups = {};
-
-  CLASS_GROUPS.forEach(group => {
-    groups[group] = [];
-  });
-
-  [...players]
-    .sort((a, b) => {
-      const ai = CLASS_ORDER.indexOf(playerClass(a));
-      const bi = CLASS_ORDER.indexOf(playerClass(b));
-
-      if (ai !== bi) return ai - bi;
-
-      return Number(a.createdAt || a.id || 0) -
-        Number(b.createdAt || b.id || 0);
-    })
-    .forEach(player => {
-      const cls = playerClass(player);
-      const group = cls === "X" ? "X" : cls.charAt(0);
-
-      if (!groups[group]) groups[group] = [];
-
-      groups[group].push(player);
-    });
-
-  content.innerHTML = `
     <div class="page-head">
       <div>
-        <h1>${detail ? "Elenco" : "Jogadores"}</h1>
-        <p>
-          ${detail
-            ? "Jogadores deste time ou seleção"
-            : "Todos os jogadores da liga"}
-        </p>
+        <h1>Jogadores</h1>
+        <p>Todos os jogadores classificados da UTL.</p>
       </div>
     </div>
 
     <div class="players-groups">
-      ${CLASS_GROUPS.map(group => {
-        const list = groups[group] || [];
-
-        return `
-          <section class="player-class ${
-            openCategories ? "open" : ""
-          }">
-            <button
-              class="player-class-header"
-              type="button"
-            >
-              <span>CLASS ${group}</span>
-              <span>⌄</span>
-            </button>
-
-            <div class="player-class-content">
-              ${
-                list.length
-                  ? renderPlayerTable(list)
-                  : `
-                    <div class="empty-state">
-                      Nenhum jogador nesta classe.
-                    </div>
-                  `
-              }
-            </div>
-          </section>
-        `;
-      }).join("")}
+      ${CLASS_GROUPS.map(group =>
+        renderPlayerClassGroup(
+          group.name,
+          group.classes,
+          players
+        )
+      ).join("")}
     </div>
   `;
-
-  $$(".player-class-header", content).forEach(button => {
-    button.addEventListener("click", () => {
-      const section = button.closest(".player-class");
-
-      if (section) {
-        section.classList.toggle("open");
-      }
-    });
-  });
 }
 
-function renderPlayerTable(players) {
+function renderPlayerClassGroup(title, classes, players) {
+  const groupPlayers = sortedPlayers(
+    players.filter(player =>
+      classes.includes(formatClass(player.class))
+    )
+  );
+
   return `
-    <div class="players-table">
-      <div class="players-table-head">
-        <span>ID</span>
-        <span>NICK</span>
-        <span>CLASS</span>
-        <span>TEAM</span>
-        <span>ROLE</span>
-        <span>OVERALL</span>
-        <span>WAGE</span>
+    <section class="player-class">
+      <div class="player-class-header">
+        <strong>${escapeHTML(title)}</strong>
       </div>
 
-      ${players.map(renderPlayerRow).join("")}
+      <div class="player-class-content">
+        ${
+          groupPlayers.length
+            ? renderPlayersTable(groupPlayers)
+            : `
+              <div class="empty-state">
+                <strong>Nenhum jogador</strong>
+                <span>Nenhum jogador está nesta categoria.</span>
+              </div>
+            `
+        }
+      </div>
+    </section>
+  `;
+}
+
+function renderPlayersTable(players) {
+  return `
+    <div style="overflow-x:auto;">
+      <div class="players-table">
+        <div class="players-table-head">
+          <span>ID</span>
+          <span>NICK</span>
+          <span>CLASS</span>
+          <span>TEAM</span>
+          <span>ROLE</span>
+          <span>OVERALL</span>
+          <span>WAGE</span>
+        </div>
+
+        ${players.map(renderPlayerRow).join("")}
+      </div>
     </div>
   `;
 }
 
 function renderPlayerRow(player) {
-  const cls = playerClass(player);
-  const team = getPlayerTeam(player);
+  const cls = formatClass(player.class);
+  const base = classBase(cls);
+  const team = playerTeam(player);
 
-  const teamHTML = team
-    ? `
-      <span class="team-cell">
+  let teamHTML;
+
+  if (team) {
+    teamHTML = `
+      <div class="team-cell">
         ${
           team.logo
-            ? `
-              <img
+            ? `<img
                 class="team-shield"
                 src="${escapeHTML(team.logo)}"
                 alt=""
-                onerror="this.style.display='none'"
-              >
-            `
+              >`
             : ""
         }
 
         <span>${escapeHTML(team.name)}</span>
-      </span>
-    `
-    : `
-      <span class="free-agent">
-        🏷️ FREE AGENT
-      </span>
+      </div>
     `;
+  } else {
+    teamHTML = `
+      <div class="team-cell free-agent">
+        <span>🏷️ FREE AGENT</span>
+      </div>
+    `;
+  }
 
   return `
     <div class="player-row">
@@ -517,1353 +570,1243 @@ function renderPlayerRow(player) {
       </span>
 
       <span>
-        <b class="class-badge class-${baseClass(cls)}">
+        <span class="class-badge class-${base}">
           ${escapeHTML(cls)}
-        </b>
+        </span>
       </span>
 
-      <span>
-        ${teamHTML}
-      </span>
+      ${teamHTML}
 
       <span>
         ${escapeHTML(player.role || "PLAYER")}
       </span>
 
       <span>
-        ${escapeHTML(player.overall ?? "0")}
+        ${escapeHTML(player.overall)}
       </span>
 
       <span>
-        ${escapeHTML(playerWage(player))}
+        ${formatMoney(player.wage)}
       </span>
     </div>
   `;
 }
 
-function renderClubs(type) {
-  const content = $("#page-content");
+function bindPlayerGroups() {
+  document.querySelectorAll(".player-class-header").forEach(header => {
+    header.addEventListener("click", () => {
+      header.parentElement.classList.toggle("open");
+    });
+  });
+}
 
-  if (!content) return;
+/* =========================================================
+   TEAMS / SELECTIONS
+   ========================================================= */
 
-  const clubs =
-    type === "team"
-      ? DATA.teams
-      : DATA.selections;
+function renderClubsPage(type) {
+  const isTeam = type === "team";
+  const clubs = isTeam
+    ? state.data?.teams || []
+    : state.data?.selections || [];
 
-  const title =
-    type === "team"
-      ? "Times"
-      : "Seleções";
+  if (state.detail) {
+    return renderClubDetail(type, state.detail);
+  }
 
-  const subtitle =
-    type === "team"
-      ? "Times participantes da UTL"
-      : "Seleções participantes da UTL";
-
-  content.innerHTML = `
+  return `
     <div class="page-head">
       <div>
-        <h1>${title}</h1>
-        <p>${subtitle}</p>
+        <h1>${isTeam ? "Times" : "Seleções"}</h1>
+        <p>
+          ${isTeam
+            ? "Confira os times participantes da UTL."
+            : "Confira as seleções cadastradas na competição."
+          }
+        </p>
       </div>
     </div>
 
-    <div class="club-list">
-      ${
-        clubs.length
-          ? clubs.map(club => renderClubCard(club, type)).join("")
-          : `
-            <div class="empty-state">
-              Nenhum ${type === "team" ? "time" : "seleção"} cadastrado.
-            </div>
-          `
-      }
-    </div>
+    ${
+      clubs.length
+        ? `
+          <div class="club-list">
+            ${clubs.map(club =>
+              renderClubCard(club, type)
+            ).join("")}
+          </div>
+        `
+        : `
+          <div class="empty-state">
+            <strong>Nenhum ${isTeam ? "time" : "seleção"} cadastrado</strong>
+            <span>A administração ainda não adicionou nenhum item.</span>
+          </div>
+        `
+    }
   `;
-
-  $("[data-club-open]", content);
-
-  $$("[data-club-open]", content).forEach(card => {
-    card.addEventListener("click", () => {
-      const [clubType, clubId] =
-        card.dataset.clubOpen.split("|");
-
-      openClubDetail(clubType, clubId);
-    });
-  });
 }
 
 function renderClubCard(club, type) {
-  const count =
-    type === "team"
-      ? DATA.players.filter(
-          player =>
-            String(player.teamId) === String(club.id)
-        ).length
-      : Array.isArray(club.players)
-        ? club.players.length
-        : 0;
+  const logo = club.logo
+    ? `
+      <img
+        class="club-logo"
+        src="${escapeHTML(club.logo)}"
+        alt=""
+      >
+    `
+    : `
+      <span class="club-logo-fallback">
+        ${escapeHTML(club.name?.charAt(0) || "?")}
+      </span>
+    `;
+
+  const players = type === "team"
+    ? (state.data.players || []).filter(
+        player => String(player.teamId) === String(club.id)
+      )
+    : (club.players || [])
+        .map(id => getPlayer(id))
+        .filter(Boolean);
 
   return `
-    <button
+    <article
       class="club-card"
-      type="button"
-      data-club-open="${type}|${escapeHTML(club.id)}"
-      style="--club-bg:${escapeHTML(
-        club.color || "#171717"
-      )}"
+      data-club-id="${escapeHTML(club.id)}"
+      style="--club-bg:${escapeHTML(club.color || "#151515")}"
     >
       <div class="club-logo-wrap">
-        ${
-          club.logo
-            ? `
-              <img
-                class="club-logo"
-                src="${escapeHTML(club.logo)}"
-                alt=""
-                onerror="this.style.display='none'"
-              >
-            `
-            : `
-              <span class="club-logo-fallback">
-                ${escapeHTML(
-                  (club.name || "?").charAt(0).toUpperCase()
-                )}
-              </span>
-            `
-        }
+        ${logo}
       </div>
 
       <div class="club-info">
-        <h3>${escapeHTML(club.name)}</h3>
-        <span>${count}/16 jogadores</span>
+        <strong>${escapeHTML(club.name)}</strong>
+        <span>${players.length}/16 jogadores</span>
       </div>
 
       <span class="club-arrow">›</span>
-    </button>
+    </article>
   `;
 }
 
-function openClubDetail(type, id) {
-  const club =
-    type === "team"
-      ? getTeam(id)
-      : getSelection(id);
+function renderClubDetail(type, club) {
+  const isTeam = type === "team";
 
-  if (!club) {
-    toast("Não foi possível encontrar este cadastro.");
-    return;
+  let players;
+
+  if (isTeam) {
+    players = (state.data.players || []).filter(
+      player => String(player.teamId) === String(club.id)
+    );
+  } else {
+    players = (club.players || [])
+      .map(id => getPlayer(id))
+      .filter(Boolean);
   }
 
-  currentClubType = type;
-  currentClubId = id;
-
-  const players =
-    type === "team"
-      ? DATA.players.filter(
-          player =>
-            String(player.teamId) === String(club.id)
-        )
-      : DATA.players.filter(player =>
-          Array.isArray(club.players) &&
-          club.players.some(
-            playerId =>
-              String(playerId) === String(player.id)
-          )
-        );
-
-  setPageTitle(club.name);
-
-  const content = $("#page-content");
-
-  content.innerHTML = `
-    <div class="club-detail">
-      <button
-        class="back-btn"
-        type="button"
-        data-club-back="${type}"
+  const logo = club.logo
+    ? `
+      <img
+        class="club-detail-logo"
+        src="${escapeHTML(club.logo)}"
+        alt=""
       >
+    `
+    : `
+      <div class="club-detail-logo fallback">
+        ${escapeHTML(club.name?.charAt(0) || "?")}
+      </div>
+    `;
+
+  return `
+    <div class="club-detail">
+
+      <button class="back-btn" id="clubBack" type="button">
         ← Voltar
       </button>
 
-      <section
+      <div
         class="club-detail-header"
-        style="--club-bg:${escapeHTML(
-          club.color || "#171717"
-        )}"
+        style="--club-bg:${escapeHTML(club.color || "#151515")}"
       >
-        ${
-          club.logo
-            ? `
-              <img
-                class="club-detail-logo"
-                src="${escapeHTML(club.logo)}"
-                alt=""
-                onerror="this.style.display='none'"
-              >
-            `
-            : `
-              <div class="club-detail-logo fallback">
-                ${escapeHTML(
-                  (club.name || "?").charAt(0).toUpperCase()
-                )}
-              </div>
-            `
-        }
+        ${logo}
 
         <div>
           <h1>${escapeHTML(club.name)}</h1>
-          <p>${players.length}/16 jogadores</p>
+          <p>
+            ${players.length}/16 jogadores
+          </p>
         </div>
-      </section>
+      </div>
 
-      <div class="club-detail-players"></div>
+      <div class="club-detail-players">
+        ${
+          players.length
+            ? `
+              <div class="players-groups">
+                ${CLASS_GROUPS.map(group =>
+                  renderPlayerClassGroup(
+                    group.name,
+                    group.classes,
+                    players
+                  )
+                ).join("")}
+              </div>
+            `
+            : `
+              <div class="empty-state">
+                <strong>Elenco vazio</strong>
+                <span>Nenhum jogador foi atribuído a este ${isTeam ? "time" : "seleção"}.</span>
+              </div>
+            `
+        }
+      </div>
     </div>
   `;
-
-  const holder = $(".club-detail-players", content);
-
-  renderPlayerGroupsInto(
-    holder,
-    players,
-    true
-  );
-
-  $("[data-club-back]", content)?.addEventListener(
-    "click",
-    () => renderPage(type === "team" ? "teams" : "selections")
-  );
 }
 
-function renderPlayerGroupsInto(holder, players, openCategories) {
-  if (!holder) return;
+function bindClubCards() {
+  if (state.detail) {
+    $("#clubBack")?.addEventListener("click", () => {
+      state.detail = null;
+      renderPage();
+      bindClubCards();
+    });
 
-  const groups = {};
+    bindPlayerGroups();
+    return;
+  }
 
-  CLASS_GROUPS.forEach(group => {
-    groups[group] = [];
-  });
+  document.querySelectorAll(".club-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const type =
+        state.page === "teams"
+          ? "team"
+          : "selection";
 
-  players.forEach(player => {
-    const cls = playerClass(player);
-    const group = cls === "X" ? "X" : cls.charAt(0);
+      const clubs =
+        type === "team"
+          ? state.data.teams || []
+          : state.data.selections || [];
 
-    if (!groups[group]) groups[group] = [];
+      state.detail = clubs.find(
+        club => String(club.id) === String(card.dataset.clubId)
+      );
 
-    groups[group].push(player);
-  });
-
-  holder.innerHTML = CLASS_GROUPS.map(group => {
-    const list = groups[group] || [];
-
-    return `
-      <section class="player-class ${
-        openCategories ? "open" : ""
-      }">
-        <button
-          class="player-class-header"
-          type="button"
-        >
-          <span>CLASS ${group}</span>
-          <span>⌄</span>
-        </button>
-
-        <div class="player-class-content">
-          ${
-            list.length
-              ? renderPlayerTable(list)
-              : `
-                <div class="empty-state">
-                  Nenhum jogador nesta classe.
-                </div>
-              `
-          }
-        </div>
-      </section>
-    `;
-  }).join("");
-
-  $$(".player-class-header", holder).forEach(button => {
-    button.addEventListener("click", () => {
-      button
-        .closest(".player-class")
-        ?.classList.toggle("open");
+      renderPage();
+      bindClubCards();
     });
   });
 }
 
+/* =========================================================
+   ADMIN
+   ========================================================= */
+
 function renderAdmin() {
-  const content = $("#page-content");
-
-  if (!content) return;
-
-  if (!isAdmin) {
-    content.innerHTML = `
+  if (!state.admin) {
+    return `
       <div class="admin-locked">
-        <h1>Admin Area</h1>
+        <h2>Admin Area</h2>
+
         <p>
-          A área administrativa é protegida.
+          Entre com a senha administrativa para gerenciar
+          links, notícias, jogadores, times e seleções.
         </p>
 
-        <button class="btn primary" id="loginBtn">
-          Entrar
-        </button>
+        <form id="loginForm">
+          <label>
+            Senha
+            <input
+              id="adminPassword"
+              type="password"
+              placeholder="Digite a senha"
+              required
+            >
+          </label>
+
+          <button class="btn primary" type="submit">
+            Entrar
+          </button>
+        </form>
       </div>
     `;
-
-    $("#loginBtn")?.addEventListener(
-      "click",
-      showLoginModal
-    );
-
-    return;
   }
 
-  content.innerHTML = `
+  return `
     <div class="page-head">
       <div>
         <h1>Admin Area</h1>
-        <p>Gerencie o conteúdo da UTL</p>
+        <p>Gerencie todo o conteúdo da ULTIMATE TCS LEAGUE.</p>
       </div>
 
-      <button class="btn secondary" id="logoutBtn">
+      <button
+        class="btn danger"
+        id="logoutBtn"
+        type="button"
+      >
         Sair
       </button>
     </div>
 
     <div class="admin-grid">
 
-      <section class="admin-card">
-        <h2>Links</h2>
+      ${renderAdminLinks()}
 
-        <form id="linksForm">
-          <label>
-            Discord
-            <input
-              id="discordLink"
-              type="url"
-              value="${escapeHTML(DATA.links.discord)}"
-              placeholder="https://discord.gg/..."
-            >
-          </label>
+      ${renderAdminNews()}
 
-          <label>
-            TikTok
-            <input
-              id="tiktokLink"
-              type="url"
-              value="${escapeHTML(DATA.links.tiktok)}"
-              placeholder="https://tiktok.com/..."
-            >
-          </label>
+      ${renderAdminCategories()}
 
-          <label>
-            Tabela
-            <input
-              id="tableLink"
-              type="url"
-              value="${escapeHTML(DATA.links.tabela)}"
-              placeholder="https://..."
-            >
-          </label>
+      ${renderAdminPlayers()}
 
-          <button class="btn primary" type="submit">
-            Salvar links
-          </button>
-        </form>
-      </section>
+      ${renderAdminTeams()}
 
-      <section class="admin-card">
-        <h2>Notícias</h2>
-
-        <form id="newsForm">
-          <label>
-            Categoria
-            <select id="newsCategory">
-              ${DATA.newsCategories.map(category => `
-                <option value="${escapeHTML(category)}">
-                  ${escapeHTML(category)}
-                </option>
-              `).join("")}
-            </select>
-          </label>
-
-          <label>
-            Título
-            <input
-              id="newsTitle"
-              type="text"
-              required
-              maxlength="120"
-            >
-          </label>
-
-          <label>
-            Descrição
-            <textarea
-              id="newsDescription"
-              required
-              maxlength="500"
-            ></textarea>
-          </label>
-
-          <label>
-            Imagem
-            <input
-              id="newsImage"
-              type="url"
-              placeholder="https://..."
-            >
-          </label>
-
-          <button class="btn primary" type="submit">
-            Criar notícia
-          </button>
-        </form>
-
-        <div class="admin-list">
-          ${DATA.news.map(news => `
-            <div class="admin-list-item">
-              <div>
-                <b>${escapeHTML(news.title)}</b>
-                <small>
-                  ${escapeHTML(news.category || "Geral")}
-                </small>
-              </div>
-
-              <button
-                class="btn danger small"
-                data-delete-news="${escapeHTML(news.id)}"
-              >
-                Excluir
-              </button>
-            </div>
-          `).join("")}
-        </div>
-      </section>
-
-      <section class="admin-card">
-        <h2>Categorias de notícias</h2>
-
-        <form id="categoryForm">
-          <label>
-            Nova categoria
-            <input
-              id="categoryName"
-              type="text"
-              maxlength="40"
-              required
-            >
-          </label>
-
-          <button class="btn primary" type="submit">
-            Criar categoria
-          </button>
-        </form>
-
-        <div class="admin-list">
-          ${DATA.newsCategories.map(category => `
-            <div class="admin-list-item">
-              <div>
-                <b>${escapeHTML(category)}</b>
-              </div>
-
-              ${
-                category === "Geral"
-                  ? `
-                    <small>Categoria padrão</small>
-                  `
-                  : `
-                    <button
-                      class="btn danger small"
-                      data-delete-category="${escapeHTML(
-                        category
-                      )}"
-                    >
-                      Excluir
-                    </button>
-                  `
-              }
-            </div>
-          `).join("")}
-        </div>
-      </section>
-
-      <section class="admin-card">
-        <h2>Jogadores</h2>
-
-        <form id="playerForm">
-
-          <label>
-            ID
-            <input
-              id="pid"
-              type="number"
-              min="1"
-              required
-            >
-          </label>
-
-          <label>
-            Nick
-            <input
-              id="pnick"
-              type="text"
-              maxlength="40"
-              required
-            >
-          </label>
-
-          <label>
-            Class
-            <select id="pclass">
-              ${CLASS_ORDER.map(cls => `
-                <option value="${cls}">
-                  ${cls}
-                </option>
-              `).join("")}
-            </select>
-          </label>
-
-          <label id="xWageWrap" hidden>
-            Wage do X
-            <select id="pxwage">
-              ${Object.entries(X_WAGES).map(
-                ([value, label]) => `
-                  <option value="${value}">
-                    ${label}
-                  </option>
-                `
-              ).join("")}
-            </select>
-          </label>
-
-          <label>
-            Overall
-            <input
-              id="poverall"
-              type="number"
-              min="0"
-              max="100"
-              value="0"
-              required
-            >
-          </label>
-
-          <label>
-            Time
-            <select id="pteam">
-              <option value="">FREE AGENT</option>
-
-              ${DATA.teams.map(team => `
-                <option value="${escapeHTML(team.id)}">
-                  ${escapeHTML(team.name)}
-                </option>
-              `).join("")}
-            </select>
-          </label>
-
-          <label>
-            Role
-            <select id="prole">
-              ${ROLE_OPTIONS.map(role => `
-                <option value="${role}">
-                  ${role}
-                </option>
-              `).join("")}
-            </select>
-          </label>
-
-          <button class="btn primary" type="submit">
-            Criar jogador
-          </button>
-        </form>
-
-        <div class="admin-list">
-          ${DATA.players.map(player => `
-            <div class="admin-list-item">
-              <div>
-                <b>
-                  ${escapeHTML(player.nick)}
-                </b>
-
-                <small>
-                  ID ${escapeHTML(player.id)}
-                  · ${escapeHTML(playerClass(player))}
-                  · ${escapeHTML(player.role || "PLAYER")}
-                </small>
-              </div>
-
-              <button
-                class="btn danger small"
-                data-delete-player="${escapeHTML(player.id)}"
-              >
-                Excluir
-              </button>
-            </div>
-          `).join("")}
-        </div>
-      </section>
-
-      <section class="admin-card">
-        <h2>Times</h2>
-
-        <form id="teamForm">
-
-          <label>
-            Nome
-            <input
-              id="teamName"
-              type="text"
-              maxlength="60"
-              required
-            >
-          </label>
-
-          <label>
-            Cor de fundo
-            <input
-              id="teamColor"
-              type="color"
-              value="#171717"
-            >
-          </label>
-
-          <label>
-            Logo
-            <input
-              id="teamLogo"
-              type="url"
-              placeholder="https://..."
-            >
-          </label>
-
-          <button class="btn primary" type="submit">
-            Criar time
-          </button>
-        </form>
-
-        <div class="admin-list">
-          ${DATA.teams.map(team => `
-            <div class="admin-list-item">
-              <div>
-                <b>${escapeHTML(team.name)}</b>
-              </div>
-
-              <button
-                class="btn danger small"
-                data-delete-team="${escapeHTML(team.id)}"
-              >
-                Excluir
-              </button>
-            </div>
-          `).join("")}
-        </div>
-      </section>
-
-      <section class="admin-card">
-        <h2>Seleções</h2>
-
-        <form id="selectionForm">
-
-          <label>
-            Nome
-            <input
-              id="selectionName"
-              type="text"
-              maxlength="60"
-              required
-            >
-          </label>
-
-          <label>
-            Cor de fundo
-            <input
-              id="selectionColor"
-              type="color"
-              value="#171717"
-            >
-          </label>
-
-          <label>
-            Logo
-            <input
-              id="selectionLogo"
-              type="url"
-              placeholder="https://..."
-            >
-          </label>
-
-          <div class="selection-players">
-            <b>Jogadores da seleção — máximo 16</b>
-
-            <div class="selection-checks">
-              ${DATA.players.map(player => `
-                <label class="check-player">
-                  <input
-                    type="checkbox"
-                    name="selectionPlayers"
-                    value="${escapeHTML(player.id)}"
-                  >
-
-                  <span>
-                    ${escapeHTML(player.nick)}
-                  </span>
-                </label>
-              `).join("")}
-            </div>
-          </div>
-
-          <button class="btn primary" type="submit">
-            Criar seleção
-          </button>
-        </form>
-
-        <div class="admin-list">
-          ${DATA.selections.map(selection => `
-            <div class="admin-list-item">
-              <div>
-                <b>
-                  ${escapeHTML(selection.name)}
-                </b>
-
-                <small>
-                  ${
-                    Array.isArray(selection.players)
-                      ? selection.players.length
-                      : 0
-                  }/16 jogadores
-                </small>
-              </div>
-
-              <button
-                class="btn danger small"
-                data-delete-selection="${escapeHTML(
-                  selection.id
-                )}"
-              >
-                Excluir
-              </button>
-            </div>
-          `).join("")}
-        </div>
-      </section>
+      ${renderAdminSelections()}
 
     </div>
   `;
-
-  bindAdminEvents();
 }
 
-function bindAdminEvents() {
-  $("#logoutBtn")?.addEventListener(
-    "click",
-    logout
-  );
+function renderAdminLinks() {
+  const links = state.data?.links || {};
 
-  $("#linksForm")?.addEventListener(
-    "submit",
-    saveLinks
-  );
+  return `
+    <section class="admin-card">
+      <h2>Links</h2>
+      <p>Configure os links oficiais usados pelo site.</p>
 
-  $("#newsForm")?.addEventListener(
-    "submit",
-    createNews
-  );
+      <form id="linksForm">
 
-  $("#categoryForm")?.addEventListener(
-    "submit",
-    createCategory
-  );
-
-  $("#playerForm")?.addEventListener(
-    "submit",
-    createPlayer
-  );
-
-  $("#teamForm")?.addEventListener(
-    "submit",
-    createTeam
-  );
-
-  $("#selectionForm")?.addEventListener(
-    "submit",
-    createSelection
-  );
-
-  $("#pclass")?.addEventListener(
-    "change",
-    updateXWage
-  );
-
-  updateXWage();
-
-  $$("[data-delete-news]").forEach(button => {
-    button.addEventListener(
-      "click",
-      () => deleteNews(button.dataset.deleteNews)
-    );
-  });
-
-  $$("[data-delete-category]").forEach(button => {
-    button.addEventListener(
-      "click",
-      () =>
-        deleteCategory(
-          button.dataset.deleteCategory
-        )
-    );
-  });
-
-  $$("[data-delete-player]").forEach(button => {
-    button.addEventListener(
-      "click",
-      () =>
-        deletePlayer(
-          button.dataset.deletePlayer
-        )
-    );
-  });
-
-  $$("[data-delete-team]").forEach(button => {
-    button.addEventListener(
-      "click",
-      () =>
-        deleteTeam(
-          button.dataset.deleteTeam
-        )
-    );
-  });
-
-  $$("[data-delete-selection]").forEach(button => {
-    button.addEventListener(
-      "click",
-      () =>
-        deleteSelection(
-          button.dataset.deleteSelection
-        )
-    );
-  });
-
-  $$('input[name="selectionPlayers"]').forEach(
-    checkbox => {
-      checkbox.addEventListener(
-        "change",
-        limitSelectionPlayers
-      );
-    }
-  );
-}
-
-function updateXWage() {
-  const wrap = $("#xWageWrap");
-  const classInput = $("#pclass");
-
-  if (!wrap || !classInput) return;
-
-  wrap.hidden = classInput.value !== "X";
-}
-
-async function saveLinks(event) {
-  event.preventDefault();
-
-  try {
-    const result = await api(
-      "/api/admin/links",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          discord: $("#discordLink").value.trim(),
-          tiktok: $("#tiktokLink").value.trim(),
-          tabela: $("#tableLink").value.trim()
-        })
-      }
-    );
-
-    DATA.links = result.links;
-
-    toast("Links salvos.");
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function createNews(event) {
-  event.preventDefault();
-
-  try {
-    const result = await api(
-      "/api/admin/news",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          category:
-            $("#newsCategory").value,
-          title:
-            $("#newsTitle").value.trim(),
-          description:
-            $("#newsDescription").value.trim(),
-          image:
-            $("#newsImage").value.trim()
-        })
-      }
-    );
-
-    DATA.news = result.news;
-
-    toast("Notícia criada.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function createCategory(event) {
-  event.preventDefault();
-
-  try {
-    const result = await api(
-      "/api/admin/news-categories",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name:
-            $("#categoryName").value.trim()
-        })
-      }
-    );
-
-    DATA.newsCategories =
-      result.newsCategories;
-
-    toast("Categoria criada.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function deleteNews(id) {
-  if (!confirm("Excluir esta notícia?")) {
-    return;
-  }
-
-  try {
-    const result = await api(
-      `/api/admin/news/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-    DATA.news = result.news;
-
-    toast("Notícia excluída.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function deleteCategory(name) {
-  if (!confirm(
-    `Excluir a categoria "${name}"?`
-  )) {
-    return;
-  }
-
-  try {
-    const result = await api(
-      `/api/admin/news-categories/${encodeURIComponent(name)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-    DATA.newsCategories =
-      result.newsCategories;
-
-    DATA.news = result.news;
-
-    toast("Categoria excluída.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function createPlayer(event) {
-  event.preventDefault();
-
-  const cls = $("#pclass").value;
-
-  const payload = {
-    id: Number($("#pid").value),
-    nick: $("#pnick").value.trim(),
-    class: cls,
-    wage:
-      cls === "X"
-        ? Number($("#pxwage").value)
-        : undefined,
-    overall: Number($("#poverall").value),
-    teamId: $("#pteam").value || null,
-    role: $("#prole").value
-  };
-
-  try {
-    const result = await api(
-      "/api/admin/players",
-      {
-        method: "POST",
-        body: JSON.stringify(payload)
-      }
-    );
-
-    DATA.players = result.players;
-
-    toast("Jogador criado.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function deletePlayer(id) {
-  if (!confirm("Excluir este jogador?")) {
-    return;
-  }
-
-  try {
-    const result = await api(
-      `/api/admin/players/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-    DATA.players = result.players;
-    DATA.selections = result.selections;
-
-    toast("Jogador excluído.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function createTeam(event) {
-  event.preventDefault();
-
-  const playersInTeam =
-    DATA.players.filter(
-      player =>
-        String(player.teamId) ===
-        String("__new__")
-    );
-
-  if (playersInTeam.length >= 16) {
-    toast("O time já possui 16 jogadores.");
-    return;
-  }
-
-  try {
-    const result = await api(
-      "/api/admin/teams",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name:
-            $("#teamName").value.trim(),
-          color:
-            $("#teamColor").value,
-          logo:
-            $("#teamLogo").value.trim()
-        })
-      }
-    );
-
-    DATA.teams = result.teams;
-
-    toast("Time criado.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function deleteTeam(id) {
-  if (!confirm(
-    "Excluir este time? Os jogadores serão enviados para FREE AGENT."
-  )) {
-    return;
-  }
-
-  try {
-    const result = await api(
-      `/api/admin/teams/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-    DATA.teams = result.teams;
-    DATA.players = result.players;
-
-    toast("Time excluído.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-function limitSelectionPlayers() {
-  const checked =
-    $$('input[name="selectionPlayers"]:checked');
-
-  if (checked.length > 16) {
-    this.checked = false;
-    toast("Uma seleção pode ter no máximo 16 jogadores.");
-  }
-}
-
-async function createSelection(event) {
-  event.preventDefault();
-
-  const players = $$(
-    'input[name="selectionPlayers"]:checked'
-  ).map(input => input.value);
-
-  if (players.length > 16) {
-    toast("Uma seleção pode ter no máximo 16 jogadores.");
-    return;
-  }
-
-  try {
-    const result = await api(
-      "/api/admin/selections",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name:
-            $("#selectionName").value.trim(),
-          color:
-            $("#selectionColor").value,
-          logo:
-            $("#selectionLogo").value.trim(),
-          players
-        })
-      }
-    );
-
-    DATA.selections =
-      result.selections;
-
-    toast("Seleção criada.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function deleteSelection(id) {
-  if (!confirm("Excluir esta seleção?")) {
-    return;
-  }
-
-  try {
-    const result = await api(
-      `/api/admin/selections/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE"
-      }
-    );
-
-    DATA.selections =
-      result.selections;
-
-    toast("Seleção excluída.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-function showLoginModal() {
-  const old = $("#loginModal");
-
-  if (old) old.remove();
-
-  const overlay = document.createElement("div");
-
-  overlay.id = "loginModal";
-  overlay.className = "modal-overlay";
-
-  overlay.innerHTML = `
-    <div class="modal">
-      <h2>Admin Area</h2>
-
-      <p>
-        Digite a senha de administrador para continuar.
-      </p>
-
-      <form id="loginForm">
         <label>
-          Senha
+          Discord
           <input
-            id="adminPassword"
-            type="password"
-            autocomplete="current-password"
+            name="discord"
+            type="url"
+            value="${escapeHTML(links.discord || "")}"
+            placeholder="https://discord.gg/..."
+          >
+        </label>
+
+        <label>
+          TikTok
+          <input
+            name="tiktok"
+            type="url"
+            value="${escapeHTML(links.tiktok || "")}"
+            placeholder="https://tiktok.com/..."
+          >
+        </label>
+
+        <label>
+          Tabela
+          <input
+            name="tabela"
+            type="url"
+            value="${escapeHTML(links.tabela || "")}"
+            placeholder="https://..."
+          >
+        </label>
+
+        <button class="btn primary" type="submit">
+          Salvar links
+        </button>
+
+      </form>
+    </section>
+  `;
+}
+
+function renderAdminNews() {
+  const categories = state.data?.newsCategories || ["Geral"];
+  const news = state.data?.news || [];
+
+  return `
+    <section class="admin-card">
+      <h2>News</h2>
+      <p>Crie e exclua notícias da liga.</p>
+
+      <form id="newsForm">
+
+        <label>
+          Título
+          <input
+            name="title"
+            type="text"
+            placeholder="Título da notícia"
             required
           >
         </label>
 
-        <div class="modal-actions">
-          <button
-            type="button"
-            class="btn secondary"
-            id="cancelLogin"
-          >
-            Cancelar
-          </button>
+        <label>
+          Descrição
+          <textarea
+            name="description"
+            placeholder="Descrição da notícia"
+            required
+          ></textarea>
+        </label>
 
-          <button
-            type="submit"
-            class="btn primary"
+        <label>
+          Imagem
+          <input
+            name="image"
+            type="url"
+            placeholder="https://..."
           >
-            Entrar
-          </button>
-        </div>
+        </label>
+
+        <label>
+          Categoria
+          <select name="category">
+            ${categories.map(category => `
+              <option value="${escapeHTML(category)}">
+                ${escapeHTML(category)}
+              </option>
+            `).join("")}
+          </select>
+        </label>
+
+        <button class="btn primary" type="submit">
+          Criar notícia
+        </button>
+
       </form>
-    </div>
+
+      <div class="admin-list">
+        ${
+          news.length
+            ? news.map(item => `
+                <div class="admin-list-item">
+                  <div>
+                    <strong>${escapeHTML(item.title)}</strong>
+                    <small>${escapeHTML(item.category || "Geral")}</small>
+                  </div>
+
+                  <button
+                    class="btn danger small delete-news"
+                    data-id="${escapeHTML(item.id)}"
+                    type="button"
+                  >
+                    Excluir
+                  </button>
+                </div>
+              `).join("")
+            : `
+              <div class="empty-state">
+                <strong>Nenhuma notícia</strong>
+                <span>Crie a primeira notícia.</span>
+              </div>
+            `
+        }
+      </div>
+    </section>
   `;
+}
 
-  document.body.appendChild(overlay);
+function renderAdminCategories() {
+  const categories =
+    state.data?.newsCategories || ["Geral"];
 
-  $("#cancelLogin")?.addEventListener(
-    "click",
-    () => overlay.remove()
-  );
+  return `
+    <section class="admin-card">
+      <h2>Categorias de News</h2>
+      <p>
+        Crie novas categorias. A categoria Geral não pode ser excluída.
+      </p>
 
-  $("#loginForm")?.addEventListener(
-    "submit",
-    login
-  );
+      <form id="categoryForm">
 
-  $("#adminPassword")?.focus();
+        <label>
+          Nome da categoria
+          <input
+            name="name"
+            type="text"
+            placeholder="Ex.: Transferências"
+            required
+          >
+        </label>
 
-  overlay.addEventListener("click", event => {
-    if (event.target === overlay) {
-      overlay.remove();
+        <button class="btn primary" type="submit">
+          Criar categoria
+        </button>
+
+      </form>
+
+      <div class="admin-list">
+        ${categories.map(category => `
+          <div class="admin-list-item">
+            <div>
+              <strong>${escapeHTML(category)}</strong>
+            </div>
+
+            ${
+              category === "Geral"
+                ? `<small>Principal</small>`
+                : `
+                  <button
+                    class="btn danger small delete-category"
+                    data-name="${escapeHTML(category)}"
+                    type="button"
+                  >
+                    Excluir
+                  </button>
+                `
+            }
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderAdminPlayers() {
+  const players = state.data?.players || [];
+  const teams = state.data?.teams || [];
+
+  return `
+    <section class="admin-card full">
+      <h2>Jogadores</h2>
+      <p>
+        Cadastre jogadores, classe, overall, salário, time e função.
+      </p>
+
+      <form id="playerForm">
+
+        <label>
+          ID
+          <input
+            name="id"
+            type="number"
+            min="1"
+            placeholder="Ex.: 1"
+            required
+          >
+        </label>
+
+        <label>
+          Nick
+          <input
+            name="nick"
+            type="text"
+            placeholder="Nick do jogador"
+            required
+          >
+        </label>
+
+        <label>
+          Class
+          <select name="class" id="playerClass" required>
+            ${CLASS_ORDER.map(cls => `
+              <option value="${cls}">
+                ${cls}
+              </option>
+            `).join("")}
+          </select>
+        </label>
+
+        <label id="xWageWrap" hidden>
+          Salário do Class X
+          <select name="wage" id="xWage">
+            ${X_WAGES.map(wage => `
+              <option value="${wage}">
+                ${formatMoney(wage)}
+              </option>
+            `).join("")}
+          </select>
+        </label>
+
+        <label>
+          Overall
+          <input
+            name="overall"
+            type="number"
+            min="0"
+            max="100"
+            placeholder="0 - 100"
+            required
+          >
+        </label>
+
+        <label>
+          Team
+          <select name="teamId">
+            <option value="">FREE AGENT</option>
+
+            ${teams.map(team => `
+              <option value="${escapeHTML(team.id)}">
+                ${escapeHTML(team.name)}
+              </option>
+            `).join("")}
+          </select>
+        </label>
+
+        <label>
+          Role
+          <select name="role" required>
+            ${ROLE_OPTIONS.map(role => `
+              <option value="${escapeHTML(role)}">
+                ${escapeHTML(role)}
+              </option>
+            `).join("")}
+          </select>
+        </label>
+
+        <button class="btn primary" type="submit">
+          Salvar jogador
+        </button>
+
+      </form>
+
+      <div class="admin-list">
+        ${
+          players.length
+            ? players.map(player => `
+                <div class="admin-list-item">
+                  <div>
+                    <strong>
+                      #${escapeHTML(player.id)} — ${escapeHTML(player.nick)}
+                    </strong>
+
+                    <small>
+                      ${escapeHTML(player.class)}
+                      · ${escapeHTML(player.role)}
+                      · ${escapeHTML(player.overall)} OVR
+                    </small>
+                  </div>
+
+                  <button
+                    class="btn danger small delete-player"
+                    data-id="${escapeHTML(player.id)}"
+                    type="button"
+                  >
+                    Excluir
+                  </button>
+                </div>
+              `).join("")
+            : `
+              <div class="empty-state">
+                <strong>Nenhum jogador</strong>
+                <span>Cadastre o primeiro jogador.</span>
+              </div>
+            `
+        }
+      </div>
+    </section>
+  `;
+}
+
+function renderAdminTeams() {
+  const teams = state.data?.teams || [];
+
+  return `
+    <section class="admin-card">
+      <h2>Times</h2>
+      <p>
+        Crie times e defina nome, escudo e cor de fundo.
+      </p>
+
+      <form id="teamForm">
+
+        <label>
+          Nome
+          <input
+            name="name"
+            type="text"
+            placeholder="Ex.: Cruzeiro"
+            required
+          >
+        </label>
+
+        <label>
+          Logo / Escudo
+          <input
+            name="logo"
+            type="url"
+            placeholder="https://..."
+          >
+        </label>
+
+        <label>
+          Cor do fundo
+          <input
+            name="color"
+            type="text"
+            placeholder="#0057FF"
+            value="#151515"
+          >
+        </label>
+
+        <button class="btn primary" type="submit">
+          Criar time
+        </button>
+
+      </form>
+
+      <div class="admin-list">
+        ${
+          teams.length
+            ? teams.map(team => `
+                <div class="admin-list-item">
+                  <div>
+                    <strong>${escapeHTML(team.name)}</strong>
+                    <small>Máximo de 16 jogadores</small>
+                  </div>
+
+                  <button
+                    class="btn danger small delete-team"
+                    data-id="${escapeHTML(team.id)}"
+                    type="button"
+                  >
+                    Excluir
+                  </button>
+                </div>
+              `).join("")
+            : `
+              <div class="empty-state">
+                <strong>Nenhum time</strong>
+                <span>Crie o primeiro time.</span>
+              </div>
+            `
+        }
+      </div>
+    </section>
+  `;
+}
+
+function renderAdminSelections() {
+  const selections = state.data?.selections || [];
+  const players = state.data?.players || [];
+
+  return `
+    <section class="admin-card">
+      <h2>Seleções</h2>
+      <p>
+        Crie uma seleção e atribua até 16 jogadores manualmente.
+      </p>
+
+      <form id="selectionForm">
+
+        <label>
+          Nome
+          <input
+            name="name"
+            type="text"
+            placeholder="Ex.: Brasil"
+            required
+          >
+        </label>
+
+        <label>
+          Logo / Escudo
+          <input
+            name="logo"
+            type="url"
+            placeholder="https://..."
+          >
+        </label>
+
+        <label>
+          Cor do fundo
+          <input
+            name="color"
+            type="text"
+            placeholder="#009C3B"
+            value="#151515"
+          >
+        </label>
+
+        <div class="selection-players">
+          <label>
+            Jogadores
+          </label>
+
+          <div class="selection-checks">
+            ${
+              players.length
+                ? players.map(player => `
+                    <label class="check-player">
+                      <input
+                        type="checkbox"
+                        name="players"
+                        value="${escapeHTML(player.id)}"
+                      >
+
+                      <span>
+                        #${escapeHTML(player.id)}
+                        —
+                        ${escapeHTML(player.nick)}
+                      </span>
+                    </label>
+                  `).join("")
+                : `
+                  <div class="empty-state">
+                    <strong>Nenhum jogador disponível</strong>
+                    <span>Cadastre jogadores primeiro.</span>
+                  </div>
+                `
+            }
+          </div>
+        </div>
+
+        <button class="btn primary" type="submit">
+          Criar seleção
+        </button>
+
+      </form>
+
+      <div class="admin-list">
+        ${
+          selections.length
+            ? selections.map(selection => `
+                <div class="admin-list-item">
+                  <div>
+                    <strong>${escapeHTML(selection.name)}</strong>
+
+                    <small>
+                      ${(selection.players || []).length}/16 jogadores
+                    </small>
+                  </div>
+
+                  <button
+                    class="btn danger small delete-selection"
+                    data-id="${escapeHTML(selection.id)}"
+                    type="button"
+                  >
+                    Excluir
+                  </button>
+                </div>
+              `).join("")
+            : `
+              <div class="empty-state">
+                <strong>Nenhuma seleção</strong>
+                <span>Crie a primeira seleção.</span>
+              </div>
+            `
+        }
+      </div>
+    </section>
+  `;
+}
+
+/* =========================================================
+   ADMIN EVENTS
+   ========================================================= */
+
+function bindAdmin() {
+  $("#loginForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const password = $("#adminPassword")?.value || "";
+
+    try {
+      await api("/api/admin/login", {
+        method: "POST",
+        body: JSON.stringify({ password })
+      });
+
+      state.admin = true;
+
+      showToast("Login realizado.");
+
+      renderPage();
+      bindAdmin();
+    } catch (error) {
+      showToast(error.message);
     }
+  });
+
+  $("#logoutBtn")?.addEventListener("click", async () => {
+    try {
+      await api("/api/admin/logout", {
+        method: "POST"
+      });
+
+      state.admin = false;
+
+      showToast("Sessão encerrada.");
+
+      renderPage();
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  $("#linksForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const form = new FormData(event.currentTarget);
+
+    try {
+      await api("/api/admin/links", {
+        method: "POST",
+        body: JSON.stringify({
+          discord: form.get("discord"),
+          tiktok: form.get("tiktok"),
+          tabela: form.get("tabela")
+        })
+      });
+
+      showToast("Links salvos.");
+
+      await loadData();
+      bindAdmin();
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  $("#categoryForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const form = new FormData(event.currentTarget);
+
+    try {
+      await api("/api/admin/news-categories", {
+        method: "POST",
+        body: JSON.stringify({
+          name: form.get("name")
+        })
+      });
+
+      showToast("Categoria criada.");
+
+      await loadData();
+      bindAdmin();
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  document.querySelectorAll(".delete-category").forEach(button => {
+    button.addEventListener("click", async () => {
+      const name = button.dataset.name;
+
+      if (!confirm(`Excluir a categoria "${name}"?`)) {
+        return;
+      }
+
+      try {
+        await api(
+          `/api/admin/news-categories/${encodeURIComponent(name)}`,
+          {
+            method: "DELETE"
+          }
+        );
+
+        showToast("Categoria excluída.");
+
+        await loadData();
+        bindAdmin();
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+  });
+
+  $("#newsForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const form = new FormData(event.currentTarget);
+
+    try {
+      await api("/api/admin/news", {
+        method: "POST",
+        body: JSON.stringify({
+          title: form.get("title"),
+          description: form.get("description"),
+          image: form.get("image"),
+          category: form.get("category")
+        })
+      });
+
+      showToast("Notícia criada.");
+
+      await loadData();
+      bindAdmin();
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  document.querySelectorAll(".delete-news").forEach(button => {
+    button.addEventListener("click", async () => {
+      const id = button.dataset.id;
+
+      if (!confirm("Excluir esta notícia?")) {
+        return;
+      }
+
+      try {
+        await api(`/api/admin/news/${encodeURIComponent(id)}`, {
+          method: "DELETE"
+        });
+
+        showToast("Notícia excluída.");
+
+        await loadData();
+        bindAdmin();
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+  });
+
+  bindPlayerAdmin();
+  bindTeamAdmin();
+  bindSelectionAdmin();
+}
+
+function bindPlayerAdmin() {
+  const classSelect = $("#playerClass");
+  const wageWrap = $("#xWageWrap");
+
+  function updateWageVisibility() {
+    if (!classSelect || !wageWrap) return;
+
+    wageWrap.hidden =
+      formatClass(classSelect.value) !== "X";
+  }
+
+  classSelect?.addEventListener(
+    "change",
+    updateWageVisibility
+  );
+
+  updateWageVisibility();
+
+  $("#playerForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const form = new FormData(event.currentTarget);
+
+    const playerClass = formatClass(
+      form.get("class")
+    );
+
+    const overall = Number(
+      form.get("overall")
+    );
+
+    if (overall < 0 || overall > 100) {
+      showToast("O overall deve estar entre 0 e 100.");
+      return;
+    }
+
+    let wage;
+
+    if (playerClass === "X") {
+      wage = Number(form.get("wage"));
+
+      if (!X_WAGES.includes(wage)) {
+        showToast("Selecione um salário válido para Class X.");
+        return;
+      }
+    } else {
+      wage = FIXED_WAGES[playerClass];
+
+      if (!wage) {
+        showToast("Classe inválida.");
+        return;
+      }
+    }
+
+    try {
+      await api("/api/admin/players", {
+        method: "POST",
+        body: JSON.stringify({
+          id: Number(form.get("id")),
+          nick: form.get("nick"),
+          class: playerClass,
+          wage,
+          overall,
+          teamId: form.get("teamId") || null,
+          role: form.get("role")
+        })
+      });
+
+      showToast("Jogador salvo.");
+
+      await loadData();
+      bindAdmin();
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  document.querySelectorAll(".delete-player").forEach(button => {
+    button.addEventListener("click", async () => {
+      const id = button.dataset.id;
+
+      if (!confirm("Excluir este jogador?")) {
+        return;
+      }
+
+      try {
+        await api(
+          `/api/admin/players/${encodeURIComponent(id)}`,
+          {
+            method: "DELETE"
+          }
+        );
+
+        showToast("Jogador excluído.");
+
+        await loadData();
+        bindAdmin();
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
   });
 }
 
-async function login(event) {
-  event.preventDefault();
+function bindTeamAdmin() {
+  $("#teamForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
 
-  const password =
-    $("#adminPassword")?.value || "";
+    const form = new FormData(event.currentTarget);
 
-  try {
-    await api(
-      "/api/admin/login",
-      {
+    try {
+      await api("/api/admin/teams", {
         method: "POST",
         body: JSON.stringify({
-          password
+          name: form.get("name"),
+          logo: form.get("logo"),
+          color: form.get("color")
         })
+      });
+
+      showToast("Time criado.");
+
+      await loadData();
+      bindAdmin();
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  document.querySelectorAll(".delete-team").forEach(button => {
+    button.addEventListener("click", async () => {
+      const id = button.dataset.id;
+
+      if (!confirm("Excluir este time?")) {
+        return;
       }
-    );
 
-    isAdmin = true;
+      try {
+        await api(
+          `/api/admin/teams/${encodeURIComponent(id)}`,
+          {
+            method: "DELETE"
+          }
+        );
 
-    $("#loginModal")?.remove();
+        showToast("Time excluído.");
 
-    toast("Login realizado.");
-
-    renderAdmin();
-  } catch (error) {
-    toast(error.message);
-  }
-}
-
-async function logout() {
-  try {
-    await api(
-      "/api/admin/logout",
-      {
-        method: "POST"
+        await loadData();
+        bindAdmin();
+      } catch (error) {
+        showToast(error.message);
       }
-    );
-  } catch {
-    // continua mesmo se a sessão já tiver expirado
-  }
-
-  isAdmin = false;
-
-  toast("Você saiu da área administrativa.");
-
-  renderAdmin();
+    });
+  });
 }
 
-async function checkAdmin() {
-  try {
-    const result = await api(
-      "/api/admin/status"
-    );
+function bindSelectionAdmin() {
+  const form = $("#selectionForm");
 
-    isAdmin = Boolean(result.authenticated);
-  } catch {
-    isAdmin = false;
-  }
+  if (!form) return;
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const data = new FormData(form);
+
+    const selectedPlayers = data.getAll("players");
+
+    if (selectedPlayers.length > 16) {
+      showToast("Uma seleção pode ter no máximo 16 jogadores.");
+      return;
+    }
+
+    try {
+      await api("/api/admin/selections", {
+        method: "POST",
+        body: JSON.stringify({
+          name: data.get("name"),
+          logo: data.get("logo"),
+          color: data.get("color"),
+          players: selectedPlayers
+        })
+      });
+
+      showToast("Seleção criada.");
+
+      await loadData();
+      bindAdmin();
+    } catch (error) {
+      showToast(error.message);
+    }
+  });
+
+  document.querySelectorAll(".delete-selection").forEach(button => {
+    button.addEventListener("click", async () => {
+      const id = button.dataset.id;
+
+      if (!confirm("Excluir esta seleção?")) {
+        return;
+      }
+
+      try {
+        await api(
+          `/api/admin/selections/${encodeURIComponent(id)}`,
+          {
+            method: "DELETE"
+          }
+        );
+
+        showToast("Seleção excluída.");
+
+        await loadData();
+        bindAdmin();
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+  });
 }
 
-function bindNavigation() {
-  $$(".nav").forEach(button => {
+/* =========================================================
+   GLOBAL EVENTS
+   ========================================================= */
+
+document.addEventListener("DOMContentLoaded", async () => {
+  document.querySelectorAll(".nav").forEach(button => {
     button.addEventListener("click", () => {
       const page = button.dataset.page;
 
       if (page === "table") {
-        showExternalConfirm(
-          DATA.links?.tabela
-        );
+        state.page = "table";
+        state.detail = null;
+
+        closeMobileMenu();
+
+        updateActiveNav("table");
+        setPageTitle("Tabela");
+
+        renderTableRedirect();
         return;
       }
 
-      renderPage(page);
+      navigate(page);
     });
   });
 
   $("#mobileMenu")?.addEventListener(
     "click",
-    () => {
-      $("#sidebar")
-        ?.classList.toggle("mobile-open");
-    }
+    openMobileMenu
   );
-}
 
-async function init() {
+  await loadAdminStatus();
   await loadData();
-  await checkAdmin();
-
-  bindNavigation();
-
-  renderPage("news");
-}
-
-document.addEventListener(
-  "DOMContentLoaded",
-  init
-);
+});
