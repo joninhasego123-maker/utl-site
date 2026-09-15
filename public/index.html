@@ -2,83 +2,143 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>ULTIMATE TCS LEAGUE</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-  <link rel="stylesheet" href="/style.css">
+  <meta
+    name="theme-color"
+    content="#080808"
+  >
+
+  <title>
+    ULTIMATE TCS LEAGUE
+  </title>
+
+  <link
+    rel="stylesheet"
+    href="/style.css"
+  >
 </head>
 
 <body>
 
   <div class="app">
 
-    <aside class="sidebar" id="sidebar">
+    <!-- =========================
+         SIDEBAR
+    ========================== -->
+
+    <aside
+      class="sidebar"
+      id="sidebar"
+    >
 
       <div class="brand">
 
-        <img
-          src="/images/logo.png"
-          alt="UTL"
-          onerror="this.style.display='none';this.nextElementSibling.style.display='block'"
-        >
+        <div class="brand-logo">
+          <img
+            src="/images/logo.png"
+            alt="UTL"
+            onerror="
+              this.style.display='none';
+              this.nextElementSibling.style.display='flex';
+            "
+          >
 
-        <span class="brand-fallback">UTL</span>
+          <span class="brand-fallback">
+            UTL
+          </span>
+        </div>
 
-        <small>
-          ULTIMATE TCS LEAGUE
-        </small>
+        <div class="brand-text">
+          <strong>
+            ULTIMATE
+          </strong>
+
+          <span>
+            TCS LEAGUE
+          </span>
+        </div>
 
       </div>
 
-      <nav>
+      <nav class="sidebar-nav">
 
         <button
-          data-page="news"
           class="nav active"
+          data-page="news"
+          type="button"
         >
+          <span class="nav-icon">▤</span>
           <span>News</span>
         </button>
 
         <button
-          data-page="table"
           class="nav"
+          data-page="table"
+          type="button"
         >
+          <span class="nav-icon">▦</span>
           <span>Tabela</span>
         </button>
 
         <button
-          data-page="players"
           class="nav"
+          data-page="players"
+          type="button"
         >
+          <span class="nav-icon">♙</span>
           <span>Jogadores</span>
         </button>
 
         <button
-          data-page="selections"
           class="nav"
+          data-page="selections"
+          type="button"
         >
+          <span class="nav-icon">⚑</span>
           <span>Seleções</span>
         </button>
 
         <button
-          data-page="teams"
           class="nav"
+          data-page="teams"
+          type="button"
         >
+          <span class="nav-icon">◈</span>
           <span>Times</span>
         </button>
 
         <button
-          data-page="admin"
           class="nav"
+          data-page="admin"
+          type="button"
         >
+          <span class="nav-icon">⚙</span>
           <span>Admin Area</span>
         </button>
 
       </nav>
 
+      <div class="sidebar-bottom">
+        <span>
+          UTL
+        </span>
+
+        <small>
+          EST. 2026
+        </small>
+      </div>
+
     </aside>
 
+
+    <!-- =========================
+         MAIN
+    ========================== -->
 
     <main class="main">
 
@@ -87,16 +147,17 @@
         <button
           class="hamb"
           id="mobileMenu"
+          type="button"
           aria-label="Abrir menu"
         >
           ☰
         </button>
 
-        <div>
+        <div class="topbar-title">
 
-          <b id="page-title">
+          <strong id="page-title">
             News
-          </b>
+          </strong>
 
           <span>
             ULTIMATE TCS LEAGUE
@@ -107,15 +168,34 @@
       </header>
 
 
-      <section id="page-content"></section>
+      <!-- =========================
+           PAGE CONTENT
+      ========================== -->
+
+      <section
+        id="page-content"
+        class="page-content"
+      ></section>
 
     </main>
 
   </div>
 
 
-  <div id="toast"></div>
+  <!-- =========================
+       TOAST
+  ========================== -->
 
+  <div
+    id="toast"
+    role="status"
+    aria-live="polite"
+  ></div>
+
+
+  <!-- =========================
+       JAVASCRIPT
+  ========================== -->
 
   <script src="/app.js"></script>
 
