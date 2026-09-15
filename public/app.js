@@ -1,7 +1,7 @@
 const state = {
   data: null,
   admin: false,
-  page: "news",
+  page: "players",
   detail: null
 };
 
@@ -191,7 +191,7 @@ function updateActiveNav(page) {
 
 /* =========================================================
    LOAD
-   ========================================================= */
+========================================================= */
 
 async function loadData() {
   try {
@@ -221,7 +221,7 @@ async function loadAdminStatus() {
 
 /* =========================================================
    NAVIGATION
-   ========================================================= */
+========================================================= */
 
 function navigate(page) {
   state.page = page;
@@ -232,15 +232,13 @@ function navigate(page) {
   updateActiveNav(page);
 
   const titles = {
-    news: "News",
-    table: "Tabela",
     players: "Jogadores",
     selections: "Seleções",
     teams: "Times",
     admin: "Admin Area"
   };
 
-  setPageTitle(titles[page] || "News");
+  setPageTitle(titles[page] || "Jogadores");
 
   renderPage();
 }
@@ -254,19 +252,6 @@ function renderPage() {
   const content = $("#page-content");
 
   if (!content) return;
-
-  if (state.page === "news") {
-    setPageTitle("News");
-    content.innerHTML = renderNews();
-    bindNews();
-    return;
-  }
-
-  if (state.page === "table") {
-    setPageTitle("Tabela");
-    renderTableRedirect();
-    return;
-  }
 
   if (state.page === "players") {
     setPageTitle("Jogadores");
@@ -297,168 +282,8 @@ function renderPage() {
 }
 
 /* =========================================================
-   NEWS
-   ========================================================= */
-
-function renderNews() {
-  const categories = state.data?.newsCategories || ["Geral"];
-  const news = state.data?.news || [];
-
-  const orderedCategories = [
-    "Geral",
-    ...categories.filter(
-      category => category !== "Geral"
-    )
-  ];
-
-  const groups = orderedCategories.map(category => {
-    const items = news.filter(
-      item => (item.category || "Geral") === category
-    );
-
-    return `
-      <section class="news-category">
-        <div class="news-category-header">
-          <strong>${escapeHTML(category)}</strong>
-        </div>
-
-        <div class="news-category-content">
-          ${
-            items.length
-              ? items.map(renderNewsCard).join("")
-              : `
-                <div class="empty-state">
-                  <strong>Nenhuma notícia</strong>
-                  <span>Esta categoria ainda não possui notícias.</span>
-                </div>
-              `
-          }
-        </div>
-      </section>
-    `;
-  }).join("");
-
-  return `
-    <div class="page-head">
-      <div>
-        <h1>News</h1>
-        <p>Confira as últimas notícias da ULTIMATE TCS LEAGUE.</p>
-      </div>
-    </div>
-
-    <div class="news-list">
-      ${groups}
-    </div>
-  `;
-}
-
-function renderNewsCard(item) {
-  const image = item.image
-    ? `<img class="news-image" src="${escapeHTML(item.image)}" alt="">`
-    : `<div class="news-image"></div>`;
-
-  return `
-    <article class="news-card">
-      ${image}
-
-      <div class="news-card-body">
-        <h3>${escapeHTML(item.title)}</h3>
-        <p>${escapeHTML(item.description)}</p>
-      </div>
-    </article>
-  `;
-}
-
-function bindNews() {
-  document.querySelectorAll(".news-category-header").forEach(header => {
-    header.addEventListener("click", () => {
-      header.parentElement.classList.toggle("open");
-    });
-  });
-}
-
-/* =========================================================
-   TABLE REDIRECT
-   ========================================================= */
-
-function renderTableRedirect() {
-  const content = $("#page-content");
-
-  content.innerHTML = `
-    <div class="page-head">
-      <div>
-        <h1>Tabela</h1>
-        <p>A tabela oficial da competição está disponível em outro site.</p>
-      </div>
-    </div>
-
-    <div class="empty-state">
-      <strong>Abrindo tabela externa</strong>
-      <span>Você será direcionado para o site configurado pela administração.</span>
-    </div>
-  `;
-
-  setTimeout(() => {
-    openTableModal();
-  }, 100);
-}
-
-function openTableModal() {
-  const url = state.data?.links?.tabela;
-
-  if (!url) {
-    showToast("A tabela ainda não foi configurada.");
-    navigate("news");
-    return;
-  }
-
-  const overlay = document.createElement("div");
-
-  overlay.className = "modal-overlay";
-
-  overlay.innerHTML = `
-    <div class="modal">
-      <h2>Você está sendo levado a outro site</h2>
-
-      <p>
-        Ao continuar, você sairá do site da ULTIMATE TCS LEAGUE
-        e será direcionado para a página externa da tabela.
-      </p>
-
-      <div class="modal-actions">
-        <button class="btn secondary" id="tableNo">
-          Não
-        </button>
-
-        <button class="btn primary" id="tableYes">
-          Sim
-        </button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  $("#tableNo")?.addEventListener("click", () => {
-    overlay.remove();
-    navigate("news");
-  });
-
-  $("#tableYes")?.addEventListener("click", () => {
-    window.location.href = url;
-  });
-
-  overlay.addEventListener("click", event => {
-    if (event.target === overlay) {
-      overlay.remove();
-      navigate("news");
-    }
-  });
-}
-
-/* =========================================================
    PLAYERS
-   ========================================================= */
+========================================================= */
 
 function renderPlayersPage(players = state.data?.players || []) {
   return `
@@ -602,7 +427,7 @@ function bindPlayerGroups() {
 
 /* =========================================================
    TEAMS / SELECTIONS
-   ========================================================= */
+========================================================= */
 
 function renderClubsPage(type) {
   const isTeam = type === "team";
@@ -707,7 +532,7 @@ function renderClubCard(club, type) {
 
 /* =========================================================
    PLAYER TABLE FOR TEAM / SELECTION
-   ========================================================= */
+========================================================= */
 
 function sortClubPlayers(players) {
   return [...players].sort((a, b) => {
@@ -794,7 +619,7 @@ function renderClubPlayerTable(players) {
 
 /* =========================================================
    TEAM / SELECTION DETAIL
-   ========================================================= */
+========================================================= */
 
 function renderClubDetail(type, club) {
   const isTeam = type === "team";
@@ -920,7 +745,7 @@ function bindClubCards() {
 
 /* =========================================================
    ADMIN
-   ========================================================= */
+========================================================= */
 
 function renderAdmin() {
   if (!state.admin) {
@@ -930,7 +755,7 @@ function renderAdmin() {
 
         <p>
           Entre com a senha administrativa para gerenciar
-          links, notícias, jogadores, times e seleções.
+          jogadores, times e seleções.
         </p>
 
         <form id="loginForm">
@@ -956,7 +781,7 @@ function renderAdmin() {
     <div class="page-head">
       <div>
         <h1>Admin Area</h1>
-        <p>Gerencie todo o conteúdo da ULTIMATE TCS LEAGUE.</p>
+        <p>Gerencie os jogadores, times e seleções da ULTIMATE TCS LEAGUE.</p>
       </div>
 
       <button
@@ -970,12 +795,6 @@ function renderAdmin() {
 
     <div class="admin-grid">
 
-      ${renderAdminLinks()}
-
-      ${renderAdminNews()}
-
-      ${renderAdminCategories()}
-
       ${renderAdminPlayers()}
 
       ${renderAdminTeams()}
@@ -983,198 +802,6 @@ function renderAdmin() {
       ${renderAdminSelections()}
 
     </div>
-  `;
-}
-
-function renderAdminLinks() {
-  const links = state.data?.links || {};
-
-  return `
-    <section class="admin-card">
-      <h2>Links</h2>
-      <p>Configure os links oficiais usados pelo site.</p>
-
-      <form id="linksForm">
-
-        <label>
-          Discord
-          <input
-            name="discord"
-            type="url"
-            value="${escapeHTML(links.discord || "")}"
-            placeholder="https://discord.gg/..."
-          >
-        </label>
-
-        <label>
-          TikTok
-          <input
-            name="tiktok"
-            type="url"
-            value="${escapeHTML(links.tiktok || "")}"
-            placeholder="https://tiktok.com/..."
-          >
-        </label>
-
-        <label>
-          Tabela
-          <input
-            name="tabela"
-            type="url"
-            value="${escapeHTML(links.tabela || "")}"
-            placeholder="https://..."
-          >
-        </label>
-
-        <button class="btn primary" type="submit">
-          Salvar links
-        </button>
-
-      </form>
-    </section>
-  `;
-}
-
-function renderAdminNews() {
-  const categories = state.data?.newsCategories || ["Geral"];
-  const news = state.data?.news || [];
-
-  return `
-    <section class="admin-card">
-      <h2>News</h2>
-      <p>Crie e exclua notícias da liga.</p>
-
-      <form id="newsForm">
-
-        <label>
-          Título
-          <input
-            name="title"
-            type="text"
-            placeholder="Título da notícia"
-            required
-          >
-        </label>
-
-        <label>
-          Descrição
-          <textarea
-            name="description"
-            placeholder="Descrição da notícia"
-            required
-          ></textarea>
-        </label>
-
-        <label>
-          Imagem
-          <input
-            name="image"
-            type="url"
-            placeholder="https://..."
-          >
-        </label>
-
-        <label>
-          Categoria
-          <select name="category">
-            ${categories.map(category => `
-              <option value="${escapeHTML(category)}">
-                ${escapeHTML(category)}
-              </option>
-            `).join("")}
-          </select>
-        </label>
-
-        <button class="btn primary" type="submit">
-          Criar notícia
-        </button>
-
-      </form>
-
-      <div class="admin-list">
-        ${
-          news.length
-            ? news.map(item => `
-                <div class="admin-list-item">
-                  <div>
-                    <strong>${escapeHTML(item.title)}</strong>
-                    <small>${escapeHTML(item.category || "Geral")}</small>
-                  </div>
-
-                  <button
-                    class="btn danger small delete-news"
-                    data-id="${escapeHTML(item.id)}"
-                    type="button"
-                  >
-                    Excluir
-                  </button>
-                </div>
-              `).join("")
-            : `
-              <div class="empty-state">
-                <strong>Nenhuma notícia</strong>
-                <span>Crie a primeira notícia.</span>
-              </div>
-            `
-        }
-      </div>
-    </section>
-  `;
-}
-
-function renderAdminCategories() {
-  const categories =
-    state.data?.newsCategories || ["Geral"];
-
-  return `
-    <section class="admin-card">
-      <h2>Categorias de News</h2>
-      <p>
-        Crie novas categorias. A categoria Geral não pode ser excluída.
-      </p>
-
-      <form id="categoryForm">
-
-        <label>
-          Nome da categoria
-          <input
-            name="name"
-            type="text"
-            placeholder="Ex.: Transferências"
-            required
-          >
-        </label>
-
-        <button class="btn primary" type="submit">
-          Criar categoria
-        </button>
-
-      </form>
-
-      <div class="admin-list">
-        ${categories.map(category => `
-          <div class="admin-list-item">
-            <div>
-              <strong>${escapeHTML(category)}</strong>
-            </div>
-
-            ${
-              category === "Geral"
-                ? `<small>Principal</small>`
-                : `
-                  <button
-                    class="btn danger small delete-category"
-                    data-name="${escapeHTML(category)}"
-                    type="button"
-                  >
-                    Excluir
-                  </button>
-                `
-            }
-          </div>
-        `).join("")}
-      </div>
-    </section>
   `;
 }
 
@@ -1509,7 +1136,7 @@ function renderAdminSelections() {
 
 /* =========================================================
    ADMIN EVENTS
-   ========================================================= */
+========================================================= */
 
 function bindAdmin() {
   $("#loginForm")?.addEventListener("submit", async event => {
@@ -1548,126 +1175,6 @@ function bindAdmin() {
     } catch (error) {
       showToast(error.message);
     }
-  });
-
-  $("#linksForm")?.addEventListener("submit", async event => {
-    event.preventDefault();
-
-    const form = new FormData(event.currentTarget);
-
-    try {
-      await api("/api/admin/links", {
-        method: "POST",
-        body: JSON.stringify({
-          discord: form.get("discord"),
-          tiktok: form.get("tiktok"),
-          tabela: form.get("tabela")
-        })
-      });
-
-      showToast("Links salvos.");
-
-      await loadData();
-      bindAdmin();
-    } catch (error) {
-      showToast(error.message);
-    }
-  });
-
-  $("#categoryForm")?.addEventListener("submit", async event => {
-    event.preventDefault();
-
-    const form = new FormData(event.currentTarget);
-
-    try {
-      await api("/api/admin/news-categories", {
-        method: "POST",
-        body: JSON.stringify({
-          name: form.get("name")
-        })
-      });
-
-      showToast("Categoria criada.");
-
-      await loadData();
-      bindAdmin();
-    } catch (error) {
-      showToast(error.message);
-    }
-  });
-
-  document.querySelectorAll(".delete-category").forEach(button => {
-    button.addEventListener("click", async () => {
-      const name = button.dataset.name;
-
-      if (!confirm(`Excluir a categoria "${name}"?`)) {
-        return;
-      }
-
-      try {
-        await api(
-          `/api/admin/news-categories/${encodeURIComponent(name)}`,
-          {
-            method: "DELETE"
-          }
-        );
-
-        showToast("Categoria excluída.");
-
-        await loadData();
-        bindAdmin();
-      } catch (error) {
-        showToast(error.message);
-      }
-    });
-  });
-
-  $("#newsForm")?.addEventListener("submit", async event => {
-    event.preventDefault();
-
-    const form = new FormData(event.currentTarget);
-
-    try {
-      await api("/api/admin/news", {
-        method: "POST",
-        body: JSON.stringify({
-          title: form.get("title"),
-          description: form.get("description"),
-          image: form.get("image"),
-          category: form.get("category")
-        })
-      });
-
-      showToast("Notícia criada.");
-
-      await loadData();
-      bindAdmin();
-    } catch (error) {
-      showToast(error.message);
-    }
-  });
-
-  document.querySelectorAll(".delete-news").forEach(button => {
-    button.addEventListener("click", async () => {
-      const id = button.dataset.id;
-
-      if (!confirm("Excluir esta notícia?")) {
-        return;
-      }
-
-      try {
-        await api(`/api/admin/news/${encodeURIComponent(id)}`, {
-          method: "DELETE"
-        });
-
-        showToast("Notícia excluída.");
-
-        await loadData();
-        bindAdmin();
-      } catch (error) {
-        showToast(error.message);
-      }
-    });
   });
 
   bindPlayerAdmin();
@@ -1897,25 +1404,12 @@ function bindSelectionAdmin() {
 
 /* =========================================================
    GLOBAL EVENTS
-   ========================================================= */
+========================================================= */
 
 document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll(".nav").forEach(button => {
     button.addEventListener("click", () => {
       const page = button.dataset.page;
-
-      if (page === "table") {
-        state.page = "table";
-        state.detail = null;
-
-        closeMobileMenu();
-
-        updateActiveNav("table");
-        setPageTitle("Tabela");
-
-        renderTableRedirect();
-        return;
-      }
 
       navigate(page);
     });
