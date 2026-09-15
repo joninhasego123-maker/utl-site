@@ -1604,3 +1604,9 @@ a {
     font-size: 18px;
   }
 }
+
+.club-player-list {
+  background: var(--club-bg);
+  border-radius: 16px;
+  padding: 12px;
+}
