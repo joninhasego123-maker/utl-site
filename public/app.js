@@ -61,7 +61,8 @@ const ROLE_OPTIONS = [
   "MANAGER"
 ];
 
-const $ = (selector) => document.querySelector(selector);
+const $ = (selector) =>
+  document.querySelector(selector);
 
 async function api(url, options = {}) {
   const response = await fetch(url, {
@@ -746,6 +747,7 @@ function renderClubPlayerTable(
 
           <div class="players-table-head">
 
+            <span>ID</span>
             <span>NICK</span>
             <span>CLASS</span>
             <span>OVERALL</span>
@@ -766,6 +768,12 @@ function renderClubPlayerTable(
 
               return `
                 <div class="player-row">
+
+                  <span class="player-id">
+                    ${escapeHTML(
+                      player.id
+                    )}
+                  </span>
 
                   <span class="player-nick">
                     ${escapeHTML(
