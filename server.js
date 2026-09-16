@@ -6,7 +6,6 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// IMPORTANTE PARA O RENDER
 app.set("trust proxy", 1);
 
 const DATA_FILE = path.join(__dirname, "data.json");
@@ -16,6 +15,12 @@ const ADMIN_PASSWORD =
 
 const SESSION_SECRET =
   process.env.SESSION_SECRET || "utl-session-secret-2026";
+
+const SUPABASE_URL =
+  process.env.SUPABASE_URL;
+
+const SUPABASE_SECRET_KEY =
+  process.env.SUPABASE_SECRET_KEY;
 
 const CLASS_ORDER = [
   "X",
@@ -31,15 +36,6 @@ const CLASS_ORDER = [
   "C+",
   "C",
   "C-",
-  "D"
-];
-
-const CLASS_GROUPS = [
-  "X",
-  "S",
-  "A",
-  "B",
-  "C",
   "D"
 ];
 
@@ -80,7 +76,6 @@ const ROLES = [
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// SESSÃO
 app.use(
   session({
     secret: SESSION_SECRET,
@@ -98,7 +93,7 @@ app.use(
 app.use(express.static(path.join(__dirname, "public")));
 
 /* =========================
-   DATA
+   DATA LOCAL
 ========================= */
 
 function defaultData() {
@@ -154,6 +149,149 @@ function saveData(data) {
   );
 }
 
+/* =========================
+   SUPABASE
+========================= */
+
+async function supabaseRequest(
+  table,
+  method = "GET",
+  body = null,
+  query = ""
+) {
+  if (
+    !SUPABASE_URL ||
+    !SUPABASE_SECRET_KEY
+  ) {
+    throw new Error(
+      "Supabase não configurado no Render."
+    );
+  }
+
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/${table}${query}`,
+    {
+      method,
+
+      headers: {
+        apikey: SUPABASE_SECRET_KEY,
+        Authorization:
+          `Bearer ${SUPABASE_SECRET_KEY}`,
+
+        "Content-Type":
+          "application/json",
+
+        Prefer:
+          method === "GET"
+            ? "return=representation"
+            : "return=representation"
+      },
+
+      body:
+        body === null
+          ? undefined
+          : JSON.stringify(body)
+    }
+  );
+
+  const text =
+    await response.text();
+
+  let data;
+
+  try {
+    data = text
+      ? JSON.parse(text)
+      : null;
+  } catch {
+    data = text;
+  }
+
+  if (!response.ok) {
+    console.error(
+      "Supabase error:",
+      response.status,
+      data
+    );
+
+    throw new Error(
+      `Supabase ${response.status}`
+    );
+  }
+
+  return data;
+}
+
+/* =========================
+   CARREGAR DADOS DO SUPABASE
+========================= */
+
+async function loadSupabaseData() {
+  const [
+    players,
+    teams,
+    selections
+  ] = await Promise.all([
+    supabaseRequest(
+      "players",
+      "GET",
+      null,
+      "?select=*&order=created_at.asc"
+    ),
+
+    supabaseRequest(
+      "teams",
+      "GET",
+      null,
+      "?select=*&order=id.asc"
+    ),
+
+    supabaseRequest(
+      "selections",
+      "GET",
+      null,
+      "?select=*&order=id.asc"
+    )
+  ]);
+
+  return {
+    players: Array.isArray(players)
+      ? players.map(normalizePlayer)
+      : [],
+
+    teams: Array.isArray(teams)
+      ? teams.map(normalizeTeam)
+      : [],
+
+    selections:
+      Array.isArray(selections)
+        ? selections.map(
+            normalizeSelection
+          )
+        : []
+  };
+}
+
+async function syncFromSupabase() {
+  const remote =
+    await loadSupabaseData();
+
+  DATA.players =
+    remote.players;
+
+  DATA.teams =
+    remote.teams;
+
+  DATA.selections =
+    remote.selections;
+}
+
+let DATA = loadData();
+
+/* =========================
+   NORMALIZATION
+========================= */
+
 function normalizeData(data) {
   const base = defaultData();
 
@@ -166,7 +304,9 @@ function normalizeData(data) {
     },
 
     newsCategories:
-      Array.isArray(data.newsCategories)
+      Array.isArray(
+        data.newsCategories
+      )
         ? data.newsCategories
         : ["Geral"],
 
@@ -181,7 +321,9 @@ function normalizeData(data) {
         : [],
 
     selections:
-      Array.isArray(data.selections)
+      Array.isArray(
+        data.selections
+      )
         ? data.selections
         : [],
 
@@ -192,22 +334,29 @@ function normalizeData(data) {
   };
 
   if (
-    !normalized.newsCategories.includes("Geral")
+    !normalized.newsCategories.includes(
+      "Geral"
+    )
   ) {
-    normalized.newsCategories.unshift("Geral");
+    normalized.newsCategories.unshift(
+      "Geral"
+    );
   }
 
-  normalized.news = normalized.news.map(
-    normalizeNews
-  );
+  normalized.news =
+    normalized.news.map(
+      normalizeNews
+    );
 
-  normalized.players = normalized.players.map(
-    normalizePlayer
-  );
+  normalized.players =
+    normalized.players.map(
+      normalizePlayer
+    );
 
-  normalized.teams = normalized.teams.map(
-    normalizeTeam
-  );
+  normalized.teams =
+    normalized.teams.map(
+      normalizeTeam
+    );
 
   normalized.selections =
     normalized.selections.map(
@@ -217,22 +366,18 @@ function normalizeData(data) {
   return normalized;
 }
 
-let DATA = loadData();
-
-saveData(DATA);
-
-/* =========================
-   NORMALIZATION
-========================= */
-
 function normalizeNews(news) {
   return {
     id:
       news.id ||
       Date.now() +
-        Math.floor(Math.random() * 1000),
+        Math.floor(
+          Math.random() * 1000
+        ),
 
     category:
+      DATA &&
+      DATA.newsCategories &&
       DATA.newsCategories.includes(
         news.category
       )
@@ -240,13 +385,19 @@ function normalizeNews(news) {
         : "Geral",
 
     title:
-      String(news.title || "").trim(),
+      String(
+        news.title || ""
+      ).trim(),
 
     description:
-      String(news.description || "").trim(),
+      String(
+        news.description || ""
+      ).trim(),
 
     image:
-      String(news.image || "").trim(),
+      String(
+        news.image || ""
+      ).trim(),
 
     createdAt:
       Number(news.createdAt) ||
@@ -255,56 +406,77 @@ function normalizeNews(news) {
 }
 
 function normalizePlayer(player) {
-  const cls = CLASS_ORDER.includes(
-    String(player.class || "").toUpperCase()
-  )
-    ? String(player.class).toUpperCase()
-    : "D";
+  const cls =
+    CLASS_ORDER.includes(
+      String(
+        player.class || ""
+      ).toUpperCase()
+    )
+      ? String(
+          player.class
+        ).toUpperCase()
+      : "D";
 
   let wage;
 
   if (cls === "X") {
-    const oldWage = Number(player.wage);
+    const oldWage =
+      Number(player.wage);
 
-    wage = X_WAGES.includes(oldWage)
-      ? oldWage
-      : 380000;
+    wage =
+      X_WAGES.includes(oldWage)
+        ? oldWage
+        : 380000;
   } else {
-    wage = FIXED_WAGES[cls];
+    wage =
+      FIXED_WAGES[cls];
   }
 
-  let role = String(
-    player.role || "PLAYER"
-  ).toUpperCase();
+  let role =
+    String(
+      player.role || "PLAYER"
+    ).toUpperCase();
 
   if (!ROLES.includes(role)) {
     role = "PLAYER";
   }
 
-  let overall = Number(player.overall);
+  let overall =
+    Number(player.overall);
 
-  if (!Number.isFinite(overall)) {
+  if (
+    !Number.isFinite(overall)
+  ) {
     overall = 0;
   }
 
   overall = Math.max(
     0,
-    Math.min(100, Math.round(overall))
+    Math.min(
+      100,
+      Math.round(overall)
+    )
   );
 
   return {
     id: Number(player.id),
 
     nick:
-      String(player.nick || "").trim(),
+      String(
+        player.nick || ""
+      ).trim(),
 
     class: cls,
 
     wage,
 
     teamId:
-      player.teamId
-        ? String(player.teamId)
+      player.teamId ||
+      player.team_id
+        ? String(
+            player.teamId ||
+            player.team_id
+          )
         : null,
 
     role,
@@ -312,8 +484,10 @@ function normalizePlayer(player) {
     overall,
 
     createdAt:
-      Number(player.createdAt) ||
-      Date.now()
+      Number(
+        player.createdAt ||
+        player.created_at
+      ) || Date.now()
   };
 }
 
@@ -328,17 +502,25 @@ function normalizeTeam(team) {
       ),
 
     name:
-      String(team.name || "").trim(),
+      String(
+        team.name || ""
+      ).trim(),
 
     color:
-      String(team.color || "#171717"),
+      String(
+        team.color || "#171717"
+      ),
 
     logo:
-      String(team.logo || "").trim()
+      String(
+        team.logo || ""
+      ).trim()
   };
 }
 
-function normalizeSelection(selection) {
+function normalizeSelection(
+  selection
+) {
   return {
     id:
       String(
@@ -349,21 +531,30 @@ function normalizeSelection(selection) {
       ),
 
     name:
-      String(selection.name || "").trim(),
+      String(
+        selection.name || ""
+      ).trim(),
 
     color:
       String(
-        selection.color || "#171717"
+        selection.color ||
+        "#171717"
       ),
 
     logo:
-      String(selection.logo || "").trim(),
+      String(
+        selection.logo || ""
+      ).trim(),
 
     players:
-      Array.isArray(selection.players)
+      Array.isArray(
+        selection.players
+      )
         ? selection.players
             .map(Number)
-            .filter(Number.isFinite)
+            .filter(
+              Number.isFinite
+            )
             .slice(0, 16)
         : []
   };
@@ -373,8 +564,15 @@ function normalizeSelection(selection) {
    HELPERS
 ========================= */
 
-function adminOnly(req, res, next) {
-  if (req.session && req.session.admin === true) {
+function adminOnly(
+  req,
+  res,
+  next
+) {
+  if (
+    req.session &&
+    req.session.admin === true
+  ) {
     return next();
   }
 
@@ -399,7 +597,8 @@ function validUrl(value) {
   if (!value) return true;
 
   try {
-    const url = new URL(value);
+    const url =
+      new URL(value);
 
     return (
       url.protocol === "http:" ||
@@ -410,7 +609,10 @@ function validUrl(value) {
   }
 }
 
-function cleanText(value, max = 500) {
+function cleanText(
+  value,
+  max = 500
+) {
   return String(value || "")
     .trim()
     .slice(0, max);
@@ -428,9 +630,21 @@ function getTeam(teamId) {
    PUBLIC DATA
 ========================= */
 
-app.get("/api/data", (req, res) => {
-  res.json(DATA);
-});
+app.get(
+  "/api/data",
+  async (req, res) => {
+    try {
+      await syncFromSupabase();
+    } catch (error) {
+      console.error(
+        "Erro ao carregar Supabase:",
+        error.message
+      );
+    }
+
+    res.json(DATA);
+  }
+);
 
 app.get(
   "/api/admin/status",
@@ -451,56 +665,65 @@ app.post(
   "/api/admin/login",
   (req, res) => {
     const password =
-      String(req.body.password || "");
+      String(
+        req.body.password || ""
+      );
 
     if (
       password !== ADMIN_PASSWORD
     ) {
       return res.status(401).json({
-        error: "Senha incorreta."
+        error:
+          "Senha incorreta."
       });
     }
 
     req.session.admin = true;
 
-    // Garante que a sessão foi salva
-    // antes de responder ao navegador.
-    req.session.save(err => {
-      if (err) {
-        console.error(
-          "Erro ao salvar sessão:",
-          err
-        );
+    req.session.save(
+      err => {
+        if (err) {
+          console.error(
+            "Erro ao salvar sessão:",
+            err
+          );
 
-        return res.status(500).json({
-          error:
-            "Não foi possível salvar a sessão."
+          return res
+            .status(500)
+            .json({
+              error:
+                "Não foi possível salvar a sessão."
+            });
+        }
+
+        res.json({
+          success: true,
+          authenticated: true
         });
       }
-
-      res.json({
-        success: true,
-        authenticated: true
-      });
-    });
+    );
   }
 );
 
 app.post(
   "/api/admin/logout",
   (req, res) => {
-    req.session.destroy(err => {
-      if (err) {
-        return res.status(500).json({
-          error:
-            "Não foi possível encerrar a sessão."
+    req.session.destroy(
+      err => {
+        if (err) {
+          return res
+            .status(500)
+            .json({
+              error:
+                "Não foi possível encerrar a sessão."
+            });
+        }
+
+        res.json({
+          success: true
         });
       }
-
-      res.json({
-        success: true
-      });
-    });
+    );
   }
 );
 
@@ -513,13 +736,22 @@ app.post(
   adminOnly,
   (req, res) => {
     const discord =
-      cleanText(req.body.discord, 300);
+      cleanText(
+        req.body.discord,
+        300
+      );
 
     const tiktok =
-      cleanText(req.body.tiktok, 300);
+      cleanText(
+        req.body.tiktok,
+        300
+      );
 
     const tabela =
-      cleanText(req.body.tabela, 300);
+      cleanText(
+        req.body.tabela,
+        300
+      );
 
     if (
       !validUrl(discord) ||
@@ -556,7 +788,10 @@ app.post(
   adminOnly,
   (req, res) => {
     const name =
-      cleanText(req.body.name, 40);
+      cleanText(
+        req.body.name,
+        40
+      );
 
     if (!name) {
       return res.status(400).json({
@@ -579,7 +814,9 @@ app.post(
       });
     }
 
-    DATA.newsCategories.push(name);
+    DATA.newsCategories.push(
+      name
+    );
 
     saveData(DATA);
 
@@ -596,7 +833,9 @@ app.delete(
   adminOnly,
   (req, res) => {
     const name =
-      decodeURIComponent(req.params.name);
+      decodeURIComponent(
+        req.params.name
+      );
 
     if (name === "Geral") {
       return res.status(400).json({
@@ -606,7 +845,9 @@ app.delete(
     }
 
     if (
-      !DATA.newsCategories.includes(name)
+      !DATA.newsCategories.includes(
+        name
+      )
     ) {
       return res.status(404).json({
         error:
@@ -616,19 +857,23 @@ app.delete(
 
     DATA.newsCategories =
       DATA.newsCategories.filter(
-        category => category !== name
+        category =>
+          category !== name
       );
 
-    DATA.news = DATA.news.map(news => {
-      if (news.category === name) {
-        return {
-          ...news,
-          category: "Geral"
-        };
-      }
+    DATA.news =
+      DATA.news.map(news => {
+        if (
+          news.category === name
+        ) {
+          return {
+            ...news,
+            category: "Geral"
+          };
+        }
 
-      return news;
-    });
+        return news;
+      });
 
     saveData(DATA);
 
@@ -651,12 +896,16 @@ app.post(
   (req, res) => {
     const category =
       cleanText(
-        req.body.category || "Geral",
+        req.body.category ||
+          "Geral",
         40
       );
 
     const title =
-      cleanText(req.body.title, 120);
+      cleanText(
+        req.body.title,
+        120
+      );
 
     const description =
       cleanText(
@@ -665,7 +914,10 @@ app.post(
       );
 
     const image =
-      cleanText(req.body.image, 500);
+      cleanText(
+        req.body.image,
+        500
+      );
 
     if (!title) {
       return res.status(400).json({
@@ -734,7 +986,8 @@ app.delete(
       );
 
     if (
-      DATA.news.length === before
+      DATA.news.length ===
+      before
     ) {
       return res.status(404).json({
         error:
@@ -758,198 +1011,236 @@ app.delete(
 app.post(
   "/api/admin/players",
   adminOnly,
-  (req, res) => {
-    const id =
-      Number(req.body.id);
+  async (req, res) => {
+    try {
+      const id =
+        Number(req.body.id);
 
-    const nick =
-      cleanText(req.body.nick, 40);
+      const nick =
+        cleanText(
+          req.body.nick,
+          40
+        );
 
-    const cls =
-      String(
-        req.body.class || ""
-      ).toUpperCase();
+      const cls =
+        String(
+          req.body.class || ""
+        ).toUpperCase();
 
-    const role =
-      String(
-        req.body.role || "PLAYER"
-      ).toUpperCase();
+      const role =
+        String(
+          req.body.role ||
+            "PLAYER"
+        ).toUpperCase();
 
-    const overall =
-      Number(req.body.overall);
+      const overall =
+        Number(
+          req.body.overall
+        );
 
-    const teamId =
-      req.body.teamId
-        ? String(req.body.teamId)
-        : null;
-
-    if (
-      !Number.isInteger(id) ||
-      id < 1
-    ) {
-      return res.status(400).json({
-        error:
-          "O ID precisa ser um número inteiro válido."
-      });
-    }
-
-    if (!nick) {
-      return res.status(400).json({
-        error:
-          "Informe o nick do jogador."
-      });
-    }
-
-    if (
-      !CLASS_ORDER.includes(cls)
-    ) {
-      return res.status(400).json({
-        error:
-          "Classe inválida."
-      });
-    }
-
-    if (!ROLES.includes(role)) {
-      return res.status(400).json({
-        error:
-          "Cargo inválido."
-      });
-    }
-
-    if (
-      !Number.isFinite(overall) ||
-      overall < 0 ||
-      overall > 100
-    ) {
-      return res.status(400).json({
-        error:
-          "Overall precisa estar entre 0 e 100."
-      });
-    }
-
-    if (
-      DATA.players.some(
-        player =>
-          Number(player.id) === id
-      )
-    ) {
-      return res.status(400).json({
-        error:
-          "Esse ID já está sendo usado."
-      });
-    }
-
-    if (teamId) {
-      const team =
-        getTeam(teamId);
-
-      if (!team) {
-        return res.status(400).json({
-          error:
-            "Time não encontrado."
-        });
-      }
-
-      const count =
-        DATA.players.filter(
-          player =>
-            String(player.teamId) ===
-            teamId
-        ).length;
-
-      if (count >= 16) {
-        return res.status(400).json({
-          error:
-            "Esse time já possui 16 jogadores."
-        });
-      }
-    }
-
-    let wage;
-
-    if (cls === "X") {
-      wage =
-        Number(req.body.wage);
+      const teamId =
+        req.body.teamId
+          ? String(
+              req.body.teamId
+            )
+          : null;
 
       if (
-        !X_WAGES.includes(wage)
+        !Number.isInteger(id) ||
+        id < 1
       ) {
         return res.status(400).json({
           error:
-            "Escolha um wage válido para a classe X."
+            "O ID precisa ser um número inteiro válido."
         });
       }
-    } else {
-      wage = FIXED_WAGES[cls];
+
+      if (!nick) {
+        return res.status(400).json({
+          error:
+            "Informe o nick do jogador."
+        });
+      }
+
+      if (
+        !CLASS_ORDER.includes(
+          cls
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            "Classe inválida."
+        });
+      }
+
+      if (!ROLES.includes(role)) {
+        return res.status(400).json({
+          error:
+            "Cargo inválido."
+        });
+      }
+
+      if (
+        !Number.isFinite(
+          overall
+        ) ||
+        overall < 0 ||
+        overall > 100
+      ) {
+        return res.status(400).json({
+          error:
+            "Overall precisa estar entre 0 e 100."
+        });
+      }
+
+      await syncFromSupabase();
+
+      if (
+        DATA.players.some(
+          player =>
+            Number(player.id) ===
+            id
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            "Esse ID já está sendo usado."
+        });
+      }
+
+      if (teamId) {
+        const team =
+          getTeam(teamId);
+
+        if (!team) {
+          return res.status(400).json({
+            error:
+              "Time não encontrado."
+          });
+        }
+
+        const count =
+          DATA.players.filter(
+            player =>
+              String(
+                player.teamId
+              ) === teamId
+          ).length;
+
+        if (count >= 16) {
+          return res.status(400).json({
+            error:
+              "Esse time já possui 16 jogadores."
+          });
+        }
+      }
+
+      let wage;
+
+      if (cls === "X") {
+        wage =
+          Number(req.body.wage);
+
+        if (
+          !X_WAGES.includes(wage)
+        ) {
+          return res.status(400).json({
+            error:
+              "Escolha um wage válido para a classe X."
+          });
+        }
+      } else {
+        wage =
+          FIXED_WAGES[cls];
+      }
+
+      const player = {
+        id,
+        nick,
+        class: cls,
+        wage,
+        team_id: teamId,
+        role,
+        overall:
+          Math.round(overall),
+        created_at:
+          Date.now()
+      };
+
+      const inserted =
+        await supabaseRequest(
+          "players",
+          "POST",
+          player
+        );
+
+      DATA.players.push(
+        normalizePlayer(
+          inserted[0] || player
+        )
+      );
+
+      res.json({
+        success: true,
+        players:
+          DATA.players
+      });
+    } catch (error) {
+      console.error(
+        "Erro ao criar jogador:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Erro ao salvar jogador no Supabase."
+      });
     }
-
-    DATA.players.push({
-      id,
-      nick,
-      class: cls,
-      wage,
-      teamId,
-      role,
-      overall:
-        Math.round(overall),
-      createdAt: Date.now()
-    });
-
-    saveData(DATA);
-
-    res.json({
-      success: true,
-      players: DATA.players
-    });
   }
 );
 
 app.delete(
   "/api/admin/players/:id",
   adminOnly,
-  (req, res) => {
-    const id =
-      Number(req.params.id);
+  async (req, res) => {
+    try {
+      const id =
+        Number(req.params.id);
 
-    const exists =
-      DATA.players.some(
-        player =>
-          Number(player.id) === id
+      await supabaseRequest(
+        "players",
+        "DELETE",
+        null,
+        `?id=eq.${id}`
       );
 
-    if (!exists) {
-      return res.status(404).json({
+      await supabaseRequest(
+        "selections",
+        "DELETE",
+        null,
+        `?players=cs.{${id}}`
+      ).catch(() => {});
+
+      await syncFromSupabase();
+
+      res.json({
+        success: true,
+        players:
+          DATA.players,
+        selections:
+          DATA.selections
+      });
+    } catch (error) {
+      console.error(
+        "Erro ao excluir jogador:",
+        error
+      );
+
+      res.status(500).json({
         error:
-          "Jogador não encontrado."
+          "Erro ao excluir jogador."
       });
     }
-
-    DATA.players =
-      DATA.players.filter(
-        player =>
-          Number(player.id) !== id
-      );
-
-    DATA.selections =
-      DATA.selections.map(
-        selection => ({
-          ...selection,
-          players:
-            selection.players.filter(
-              playerId =>
-                Number(playerId) !== id
-            )
-        })
-      );
-
-    saveData(DATA);
-
-    res.json({
-      success: true,
-      players: DATA.players,
-      selections:
-        DATA.selections
-    });
   }
 );
 
@@ -960,109 +1251,143 @@ app.delete(
 app.post(
   "/api/admin/teams",
   adminOnly,
-  (req, res) => {
-    const name =
-      cleanText(req.body.name, 60);
+  async (req, res) => {
+    try {
+      const name =
+        cleanText(
+          req.body.name,
+          60
+        );
 
-    const color =
-      cleanText(
-        req.body.color || "#171717",
-        30
+      const color =
+        cleanText(
+          req.body.color ||
+            "#171717",
+          30
+        );
+
+      const logo =
+        cleanText(
+          req.body.logo,
+          500
+        );
+
+      if (!name) {
+        return res.status(400).json({
+          error:
+            "Informe o nome do time."
+        });
+      }
+
+      if (!validUrl(logo)) {
+        return res.status(400).json({
+          error:
+            "O link do logo é inválido."
+        });
+      }
+
+      await syncFromSupabase();
+
+      if (
+        DATA.teams.some(
+          team =>
+            team.name.toLowerCase() ===
+            name.toLowerCase()
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            "Esse time já existe."
+        });
+      }
+
+      const team = {
+        id: generateId("team"),
+        name,
+        color,
+        logo
+      };
+
+      const inserted =
+        await supabaseRequest(
+          "teams",
+          "POST",
+          team
+        );
+
+      DATA.teams.push(
+        normalizeTeam(
+          inserted[0] || team
+        )
       );
 
-    const logo =
-      cleanText(req.body.logo, 500);
+      res.json({
+        success: true,
+        teams:
+          DATA.teams
+      });
+    } catch (error) {
+      console.error(
+        "Erro ao criar time:",
+        error
+      );
 
-    if (!name) {
-      return res.status(400).json({
+      res.status(500).json({
         error:
-          "Informe o nome do time."
+          "Erro ao salvar time no Supabase."
       });
     }
-
-    if (!validUrl(logo)) {
-      return res.status(400).json({
-        error:
-          "O link do logo é inválido."
-      });
-    }
-
-    if (
-      DATA.teams.some(
-        team =>
-          team.name.toLowerCase() ===
-          name.toLowerCase()
-      )
-    ) {
-      return res.status(400).json({
-        error:
-          "Esse time já existe."
-      });
-    }
-
-    DATA.teams.push({
-      id: generateId("team"),
-      name,
-      color,
-      logo
-    });
-
-    saveData(DATA);
-
-    res.json({
-      success: true,
-      teams: DATA.teams
-    });
   }
 );
 
 app.delete(
   "/api/admin/teams/:id",
   adminOnly,
-  (req, res) => {
-    const id =
-      String(req.params.id);
+  async (req, res) => {
+    try {
+      const id =
+        String(req.params.id);
 
-    const exists =
-      DATA.teams.some(
-        team =>
-          String(team.id) === id
+      await supabaseRequest(
+        "players",
+        "PATCH",
+        {
+          team_id: null
+        },
+        `?team_id=eq.${encodeURIComponent(
+          id
+        )}`
       );
 
-    if (!exists) {
-      return res.status(404).json({
+      await supabaseRequest(
+        "teams",
+        "DELETE",
+        null,
+        `?id=eq.${encodeURIComponent(
+          id
+        )}`
+      );
+
+      await syncFromSupabase();
+
+      res.json({
+        success: true,
+        teams:
+          DATA.teams,
+        players:
+          DATA.players
+      });
+    } catch (error) {
+      console.error(
+        "Erro ao excluir time:",
+        error
+      );
+
+      res.status(500).json({
         error:
-          "Time não encontrado."
+          "Erro ao excluir time."
       });
     }
-
-    DATA.teams =
-      DATA.teams.filter(
-        team =>
-          String(team.id) !== id
-      );
-
-    DATA.players =
-      DATA.players.map(player => {
-        if (
-          String(player.teamId) === id
-        ) {
-          return {
-            ...player,
-            teamId: null
-          };
-        }
-
-        return player;
-      });
-
-    saveData(DATA);
-
-    res.json({
-      success: true,
-      teams: DATA.teams,
-      players: DATA.players
-    });
   }
 );
 
@@ -1073,140 +1398,179 @@ app.delete(
 app.post(
   "/api/admin/selections",
   adminOnly,
-  (req, res) => {
-    const name =
-      cleanText(
-        req.body.name,
-        60
-      );
+  async (req, res) => {
+    try {
+      const name =
+        cleanText(
+          req.body.name,
+          60
+        );
 
-    const color =
-      cleanText(
-        req.body.color || "#171717",
-        30
-      );
+      const color =
+        cleanText(
+          req.body.color ||
+            "#171717",
+          30
+        );
 
-    const logo =
-      cleanText(
-        req.body.logo,
-        500
-      );
+      const logo =
+        cleanText(
+          req.body.logo,
+          500
+        );
 
-    const players =
-      Array.isArray(req.body.players)
-        ? req.body.players
-            .map(Number)
-            .filter(Number.isInteger)
-        : [];
+      const players =
+        Array.isArray(
+          req.body.players
+        )
+          ? req.body.players
+              .map(Number)
+              .filter(
+                Number.isInteger
+              )
+          : [];
 
-    if (!name) {
-      return res.status(400).json({
-        error:
-          "Informe o nome da seleção."
-      });
-    }
+      if (!name) {
+        return res.status(400).json({
+          error:
+            "Informe o nome da seleção."
+        });
+      }
 
-    if (!validUrl(logo)) {
-      return res.status(400).json({
-        error:
-          "O link do logo é inválido."
-      });
-    }
+      if (!validUrl(logo)) {
+        return res.status(400).json({
+          error:
+            "O link do logo é inválido."
+        });
+      }
 
-    if (players.length > 16) {
-      return res.status(400).json({
-        error:
-          "Uma seleção pode ter no máximo 16 jogadores."
-      });
-    }
+      if (players.length > 16) {
+        return res.status(400).json({
+          error:
+            "Uma seleção pode ter no máximo 16 jogadores."
+        });
+      }
 
-    const uniquePlayers = [
-      ...new Set(players)
-    ];
+      const uniquePlayers = [
+        ...new Set(players)
+      ];
 
-    const validPlayers =
-      uniquePlayers.filter(id =>
-        DATA.players.some(
-          player =>
-            Number(player.id) === id
+      await syncFromSupabase();
+
+      const validPlayers =
+        uniquePlayers.filter(
+          id =>
+            DATA.players.some(
+              player =>
+                Number(player.id) ===
+                id
+            )
+        );
+
+      if (
+        validPlayers.length !==
+        uniquePlayers.length
+      ) {
+        return res.status(400).json({
+          error:
+            "Um ou mais jogadores não existem."
+        });
+      }
+
+      if (
+        DATA.selections.some(
+          selection =>
+            selection.name.toLowerCase() ===
+            name.toLowerCase()
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            "Essa seleção já existe."
+        });
+      }
+
+      const selection = {
+        id:
+          generateId("selection"),
+        name,
+        color,
+        logo,
+        players:
+          validPlayers.slice(
+            0,
+            16
+          )
+      };
+
+      const inserted =
+        await supabaseRequest(
+          "selections",
+          "POST",
+          selection
+        );
+
+      DATA.selections.push(
+        normalizeSelection(
+          inserted[0] ||
+            selection
         )
       );
 
-    if (
-      validPlayers.length !==
-      uniquePlayers.length
-    ) {
-      return res.status(400).json({
+      res.json({
+        success: true,
+        selections:
+          DATA.selections
+      });
+    } catch (error) {
+      console.error(
+        "Erro ao criar seleção:",
+        error
+      );
+
+      res.status(500).json({
         error:
-          "Um ou mais jogadores não existem."
+          "Erro ao salvar seleção no Supabase."
       });
     }
-
-    if (
-      DATA.selections.some(
-        selection =>
-          selection.name.toLowerCase() ===
-          name.toLowerCase()
-      )
-    ) {
-      return res.status(400).json({
-        error:
-          "Essa seleção já existe."
-      });
-    }
-
-    DATA.selections.push({
-      id: generateId("selection"),
-      name,
-      color,
-      logo,
-      players:
-        validPlayers.slice(0, 16)
-    });
-
-    saveData(DATA);
-
-    res.json({
-      success: true,
-      selections:
-        DATA.selections
-    });
   }
 );
 
 app.delete(
   "/api/admin/selections/:id",
   adminOnly,
-  (req, res) => {
-    const id =
-      String(req.params.id);
+  async (req, res) => {
+    try {
+      const id =
+        String(req.params.id);
 
-    const exists =
-      DATA.selections.some(
-        selection =>
-          String(selection.id) === id
+      await supabaseRequest(
+        "selections",
+        "DELETE",
+        null,
+        `?id=eq.${encodeURIComponent(
+          id
+        )}`
       );
 
-    if (!exists) {
-      return res.status(404).json({
+      await syncFromSupabase();
+
+      res.json({
+        success: true,
+        selections:
+          DATA.selections
+      });
+    } catch (error) {
+      console.error(
+        "Erro ao excluir seleção:",
+        error
+      );
+
+      res.status(500).json({
         error:
-          "Seleção não encontrada."
+          "Erro ao excluir seleção."
       });
     }
-
-    DATA.selections =
-      DATA.selections.filter(
-        selection =>
-          String(selection.id) !== id
-      );
-
-    saveData(DATA);
-
-    res.json({
-      success: true,
-      selections:
-        DATA.selections
-    });
   }
 );
 
@@ -1232,9 +1596,22 @@ app.use(
 
 app.listen(
   PORT,
-  () => {
+  async () => {
     console.log(
       `UTL Site rodando na porta ${PORT}`
     );
+
+    try {
+      await syncFromSupabase();
+
+      console.log(
+        "Supabase conectado com sucesso."
+      );
+    } catch (error) {
+      console.error(
+        "Erro ao conectar ao Supabase:",
+        error.message
+      );
+    }
   }
 );
