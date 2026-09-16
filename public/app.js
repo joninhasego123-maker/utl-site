@@ -23,36 +23,36 @@ const CLASS_ORDER = [
 ];
 
 const CLASS_GROUPS = [
-  { name: "CLASS X", classes: ["X"] },
-  { name: "CLASS S", classes: ["S+", "S", "S-"] },
-  { name: "CLASS A", classes: ["A+", "A", "A-"] },
-  { name: "CLASS B", classes: ["B+", "B", "B-"] },
-  { name: "CLASS C", classes: ["C+", "C", "C-"] },
-  { name: "CLASS D", classes: ["D"] }
-];
-
-const FIXED_WAGES = {
-  D: 75000,
-  "C-": 85000,
-  C: 90000,
-  "C+": 100000,
-  "B-": 125000,
-  B: 150000,
-  "B+": 175000,
-  "A-": 200000,
-  A: 250000,
-  "A+": 275000,
-  "S-": 300000,
-  S: 325000,
-  "S+": 350000
-};
-
-const X_WAGES = [
-  380000,
-  385000,
-  390000,
-  395000,
-  400000
+  {
+    name: "X",
+    classes: ["X"],
+    color: "#6A1B9A"
+  },
+  {
+    name: "S",
+    classes: ["S+", "S", "S-"],
+    color: "#1565C0"
+  },
+  {
+    name: "A",
+    classes: ["A+", "A", "A-"],
+    color: "#C62828"
+  },
+  {
+    name: "B",
+    classes: ["B+", "B", "B-"],
+    color: "#EF6C00"
+  },
+  {
+    name: "C",
+    classes: ["C+", "C", "C-"],
+    color: "#F9A825"
+  },
+  {
+    name: "D",
+    classes: ["D"],
+    color: "#616161"
+  }
 ];
 
 const ROLE_OPTIONS = [
@@ -285,8 +285,6 @@ function renderPage() {
     content.innerHTML =
       renderPlayersPage();
 
-    bindPlayerGroups();
-
     return;
   }
 
@@ -341,13 +339,16 @@ function renderPlayersPage(
     </div>
 
     <div class="players-groups">
+
       ${CLASS_GROUPS.map(group =>
         renderPlayerClassGroup(
           group.name,
           group.classes,
+          group.color,
           players
         )
       ).join("")}
+
     </div>
   `;
 }
@@ -355,6 +356,7 @@ function renderPlayersPage(
 function renderPlayerClassGroup(
   title,
   classes,
+  color,
   players
 ) {
   const groupPlayers =
@@ -367,12 +369,17 @@ function renderPlayerClassGroup(
     );
 
   return `
-    <section class="player-class">
+    <section
+      class="player-class player-tier-${classBase(title)}"
+      style="--tier-color:${escapeHTML(color)}"
+    >
 
       <div class="player-class-header">
+
         <strong>
           ${escapeHTML(title)}
         </strong>
+
       </div>
 
       <div class="player-class-content">
@@ -389,7 +396,7 @@ function renderPlayerClassGroup(
                 </strong>
 
                 <span>
-                  Nenhum jogador está nesta categoria.
+                  Nenhum jogador está neste Tier.
                 </span>
               </div>
             `
@@ -403,19 +410,17 @@ function renderPlayerClassGroup(
 
 function renderPlayersTable(players) {
   return `
-    <div style="overflow-x:auto;">
+    <div class="players-table-scroll">
 
       <div class="players-table">
 
         <div class="players-table-head">
 
-          <span>ID</span>
-          <span>NICK</span>
-          <span>CLASS</span>
-          <span>TEAM</span>
-          <span>ROLE</span>
+          <span>USER ID</span>
+          <span>USERNAME</span>
+          <span>TIER</span>
           <span>OVERALL</span>
-          <span>WAGE</span>
+          <span>TEAM</span>
 
         </div>
 
@@ -432,9 +437,6 @@ function renderPlayersTable(players) {
 function renderPlayerRow(player) {
   const cls =
     formatClass(player.class);
-
-  const base =
-    classBase(cls);
 
   const team =
     playerTeam(player);
@@ -482,7 +484,7 @@ function renderPlayerRow(player) {
   return `
     <div class="player-row">
 
-      <span>
+      <span class="player-id">
         ${escapeHTML(player.id)}
       </span>
 
@@ -490,22 +492,8 @@ function renderPlayerRow(player) {
         ${escapeHTML(player.nick)}
       </span>
 
-      <span>
-
-        <span
-          class="class-badge class-${base}"
-        >
-          ${escapeHTML(cls)}
-        </span>
-
-      </span>
-
-      ${teamHTML}
-
-      <span>
-        ${escapeHTML(
-          player.role || "PLAYER"
-        )}
+      <span class="player-tier">
+        ${escapeHTML(cls)}
       </span>
 
       <span>
@@ -514,31 +502,10 @@ function renderPlayerRow(player) {
         )}
       </span>
 
-      <span>
-        ${formatMoney(player.wage)}
-      </span>
+      ${teamHTML}
 
     </div>
   `;
-}
-
-function bindPlayerGroups() {
-  document
-    .querySelectorAll(
-      ".player-class-header"
-    )
-    .forEach(header => {
-
-      header.addEventListener(
-        "click",
-        () => {
-          header.parentElement.classList.toggle(
-            "open"
-          );
-        }
-      );
-
-    });
 }
 
 /* =========================================================
@@ -690,7 +657,7 @@ function renderClubCard(
         </strong>
 
         <span>
-          ${players.length}/16 jogadores
+          ${players.length}/16
         </span>
 
       </div>
@@ -721,7 +688,11 @@ function sortClubPlayers(players) {
           formatClass(b.class)
         );
 
-      return classA - classB;
+      if (classA !== classB) {
+        return classA - classB;
+      }
+
+      return Number(a.id) - Number(b.id);
     }
   );
 }
@@ -741,9 +712,9 @@ function renderClubPlayerTable(
       )}"
     >
 
-      <div style="overflow-x:auto;">
+      <div class="players-table-scroll">
 
-        <div class="players-table">
+        <div class="players-table club-players-table">
 
           <div class="players-table-head">
 
@@ -763,9 +734,6 @@ function renderClubPlayerTable(
                   player.class
                 );
 
-              const base =
-                classBase(cls);
-
               return `
                 <div class="player-row">
 
@@ -781,14 +749,8 @@ function renderClubPlayerTable(
                     )}
                   </span>
 
-                  <span>
-
-                    <span
-                      class="class-badge class-${base}"
-                    >
-                      ${escapeHTML(cls)}
-                    </span>
-
+                  <span class="player-tier">
+                    ${escapeHTML(cls)}
                   </span>
 
                   <span>
@@ -891,17 +853,21 @@ function renderClubDetail(
         )}"
       >
 
-        ${logo}
+        <div class="club-detail-main">
 
-        <div>
+          ${logo}
 
-          <h1>
-            ${escapeHTML(club.name)}
-          </h1>
+          <div class="club-detail-info">
 
-          <p>
-            ${players.length}/16 jogadores
-          </p>
+            <h1>
+              ${escapeHTML(club.name)}
+            </h1>
+
+          </div>
+
+          <div class="club-detail-count">
+            ${players.length}/16
+          </div>
 
         </div>
 
@@ -1092,7 +1058,7 @@ function renderAdminPlayers() {
       </h2>
 
       <p>
-        Cadastre jogadores, classe, overall, salário, time e função.
+        Cadastre jogadores, Tier, overall, wage, time e função.
       </p>
 
       <form id="playerForm">
@@ -1104,7 +1070,7 @@ function renderAdminPlayers() {
             name="id"
             type="number"
             min="1"
-            placeholder="Ex.: 1"
+            placeholder="Ex.: 12345678"
             required
           >
 
@@ -1123,7 +1089,7 @@ function renderAdminPlayers() {
         </label>
 
         <label>
-          Class
+          Tier
 
           <select
             name="class"
@@ -1133,8 +1099,8 @@ function renderAdminPlayers() {
 
             ${CLASS_ORDER
               .map(cls => `
-                <option value="${cls}">
-                  ${cls}
+                <option value="${escapeHTML(cls)}">
+                  ${escapeHTML(cls)}
                 </option>
               `)
               .join("")}
@@ -1143,26 +1109,17 @@ function renderAdminPlayers() {
 
         </label>
 
-        <label
-          id="xWageWrap"
-          hidden
-        >
-          Salário do Class X
+        <label>
+          Wage
 
-          <select
+          <input
             name="wage"
-            id="xWage"
+            type="number"
+            min="0"
+            step="1"
+            placeholder="Ex.: 250000"
+            required
           >
-
-            ${X_WAGES
-              .map(wage => `
-                <option value="${wage}">
-                  ${formatMoney(wage)}
-                </option>
-              `)
-              .join("")}
-
-          </select>
 
         </label>
 
@@ -1268,13 +1225,17 @@ function renderAdminPlayers() {
                         )}
                         ·
                         ${escapeHTML(
-                          player.role
+                          player.role || "PLAYER"
                         )}
                         ·
                         ${escapeHTML(
                           player.overall
                         )}
                         OVR
+                        ·
+                        ${formatMoney(
+                          player.wage
+                        )}
                       </small>
 
                     </div>
@@ -1692,34 +1653,6 @@ function bindAdmin() {
 
 function bindPlayerAdmin() {
 
-  const classSelect =
-    $("#playerClass");
-
-  const wageWrap =
-    $("#xWageWrap");
-
-  function updateWageVisibility() {
-
-    if (
-      !classSelect ||
-      !wageWrap
-    ) {
-      return;
-    }
-
-    wageWrap.hidden =
-      formatClass(
-        classSelect.value
-      ) !== "X";
-  }
-
-  classSelect?.addEventListener(
-    "change",
-    updateWageVisibility
-  );
-
-  updateWageVisibility();
-
   $("#playerForm")?.addEventListener(
     "submit",
     async event => {
@@ -1741,6 +1674,11 @@ function bindPlayerAdmin() {
           form.get("overall")
         );
 
+      const wage =
+        Number(
+          form.get("wage")
+        );
+
       if (
         overall < 0 ||
         overall > 100
@@ -1752,42 +1690,15 @@ function bindPlayerAdmin() {
         return;
       }
 
-      let wage;
-
       if (
-        playerClass === "X"
+        !Number.isFinite(wage) ||
+        wage < 0
       ) {
+        showToast(
+          "Digite uma wage válida."
+        );
 
-        wage =
-          Number(
-            form.get("wage")
-          );
-
-        if (
-          !X_WAGES.includes(wage)
-        ) {
-          showToast(
-            "Selecione um salário válido para Class X."
-          );
-
-          return;
-        }
-
-      } else {
-
-        wage =
-          FIXED_WAGES[
-            playerClass
-          ];
-
-        if (!wage) {
-
-          showToast(
-            "Classe inválida."
-          );
-
-          return;
-        }
+        return;
       }
 
       try {
