@@ -154,26 +154,6 @@ function playerTeam(player) {
   return getTeam(player.teamId);
 }
 
-/*
- * Ordenação:
- * X
- * S+
- * S
- * S-
- * A+
- * A
- * A-
- * B+
- * B
- * B-
- * C+
- * C
- * C-
- * D
- *
- * Jogadores do mesmo Tier mantêm a ordem
- * original em que estão cadastrados.
- */
 function sortedPlayers(players) {
   return players
     .map((player, index) => ({
@@ -1331,8 +1311,7 @@ function renderAdminTeams() {
 
           <input
             name="color"
-            type="text"
-            placeholder="#0057FF"
+            type="color"
             value="#151515"
           >
         </label>
@@ -1448,8 +1427,7 @@ function renderAdminSelections() {
 
           <input
             name="color"
-            type="text"
-            placeholder="#009C3B"
+            type="color"
             value="#151515"
           >
         </label>
