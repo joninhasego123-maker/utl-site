@@ -61,7 +61,7 @@ const ROLE_OPTIONS = [
   "MANAGER"
 ];
 
-const $ = (selector) =>
+const $ = selector =>
   document.querySelector(selector);
 
 async function api(url, options = {}) {
@@ -129,7 +129,9 @@ function classBase(value) {
 }
 
 function getTeam(id) {
-  if (!state.data?.teams) return null;
+  if (!state.data?.teams) {
+    return null;
+  }
 
   return state.data.teams.find(
     team =>
@@ -138,7 +140,9 @@ function getTeam(id) {
 }
 
 function getPlayer(id) {
-  if (!state.data?.players) return null;
+  if (!state.data?.players) {
+    return null;
+  }
 
   return state.data.players.find(
     player =>
@@ -150,24 +154,60 @@ function playerTeam(player) {
   return getTeam(player.teamId);
 }
 
+/*
+ * Ordenação:
+ * X
+ * S+
+ * S
+ * S-
+ * A+
+ * A
+ * A-
+ * B+
+ * B
+ * B-
+ * C+
+ * C
+ * C-
+ * D
+ *
+ * Jogadores do mesmo Tier mantêm a ordem
+ * original em que estão cadastrados.
+ */
 function sortedPlayers(players) {
-  return [...players].sort((a, b) => {
-    const classA =
-      CLASS_ORDER.indexOf(
-        formatClass(a.class)
-      );
+  return players
+    .map((player, index) => ({
+      player,
+      index
+    }))
+    .sort((a, b) => {
+      const classA =
+        CLASS_ORDER.indexOf(
+          formatClass(a.player.class)
+        );
 
-    const classB =
-      CLASS_ORDER.indexOf(
-        formatClass(b.class)
-      );
+      const classB =
+        CLASS_ORDER.indexOf(
+          formatClass(b.player.class)
+        );
 
-    if (classA !== classB) {
-      return classA - classB;
-    }
+      const safeClassA =
+        classA === -1
+          ? CLASS_ORDER.length
+          : classA;
 
-    return Number(a.id) - Number(b.id);
-  });
+      const safeClassB =
+        classB === -1
+          ? CLASS_ORDER.length
+          : classB;
+
+      if (safeClassA !== safeClassB) {
+        return safeClassA - safeClassB;
+      }
+
+      return a.index - b.index;
+    })
+    .map(item => item.player);
 }
 
 function showToast(message) {
@@ -202,12 +242,14 @@ function openMobileMenu() {
 }
 
 function updateActiveNav(page) {
-  document.querySelectorAll(".nav").forEach(button => {
-    button.classList.toggle(
-      "active",
-      button.dataset.page === page
-    );
-  });
+  document
+    .querySelectorAll(".nav")
+    .forEach(button => {
+      button.classList.toggle(
+        "active",
+        button.dataset.page === page
+      );
+    });
 }
 
 /* =========================================================
@@ -216,7 +258,8 @@ function updateActiveNav(page) {
 
 async function loadData() {
   try {
-    const result = await api("/api/data");
+    const result =
+      await api("/api/data");
 
     state.data =
       result.data || result;
@@ -444,7 +487,6 @@ function renderPlayerRow(player) {
   let teamHTML;
 
   if (team) {
-
     teamHTML = `
       <div class="team-cell">
 
@@ -468,17 +510,16 @@ function renderPlayerRow(player) {
 
       </div>
     `;
-
   } else {
-
     teamHTML = `
       <div class="team-cell free-agent">
+
         <span>
           🏷️ FREE AGENT
         </span>
+
       </div>
     `;
-
   }
 
   return `
@@ -612,7 +653,6 @@ function renderClubCard(
   let players = [];
 
   if (type === "team") {
-
     players =
       (
         state.data?.players || []
@@ -623,16 +663,13 @@ function renderClubCard(
           ) ===
           String(club.id)
       );
-
   } else {
-
     players =
       (club.players || [])
         .map(id =>
           getPlayer(id)
         )
         .filter(Boolean);
-
   }
 
   return `
@@ -675,26 +712,7 @@ function renderClubCard(
 ========================================================= */
 
 function sortClubPlayers(players) {
-  return [...players].sort(
-    (a, b) => {
-
-      const classA =
-        CLASS_ORDER.indexOf(
-          formatClass(a.class)
-        );
-
-      const classB =
-        CLASS_ORDER.indexOf(
-          formatClass(b.class)
-        );
-
-      if (classA !== classB) {
-        return classA - classB;
-      }
-
-      return Number(a.id) - Number(b.id);
-    }
-  );
+  return sortedPlayers(players);
 }
 
 function renderClubPlayerTable(
@@ -767,7 +785,6 @@ function renderClubPlayerTable(
 
                 </div>
               `;
-
             })
             .join("")}
 
@@ -793,7 +810,6 @@ function renderClubDetail(
   let players = [];
 
   if (isTeam) {
-
     players =
       (
         state.data?.players || []
@@ -804,16 +820,13 @@ function renderClubDetail(
           ) ===
           String(club.id)
       );
-
   } else {
-
     players =
       (club.players || [])
         .map(id =>
           getPlayer(id)
         )
         .filter(Boolean);
-
   }
 
   const logo =
@@ -904,7 +917,6 @@ function renderClubDetail(
 }
 
 function bindClubCards() {
-
   if (state.detail) {
 
     $("#clubBack")?.addEventListener(
@@ -949,6 +961,10 @@ function bindClubCards() {
                 )
             );
 
+          if (!state.detail) {
+            return;
+          }
+
           renderPage();
           bindClubCards();
 
@@ -963,7 +979,6 @@ function bindClubCards() {
 ========================================================= */
 
 function renderAdmin() {
-
   if (!state.admin) {
 
     return `
@@ -1043,7 +1058,6 @@ function renderAdmin() {
 }
 
 function renderAdminPlayers() {
-
   const players =
     state.data?.players || [];
 
@@ -1275,7 +1289,6 @@ function renderAdminPlayers() {
 }
 
 function renderAdminTeams() {
-
   const teams =
     state.data?.teams || [];
 
@@ -1390,7 +1403,6 @@ function renderAdminTeams() {
 }
 
 function renderAdminSelections() {
-
   const selections =
     state.data?.selections || [];
 
@@ -1571,7 +1583,6 @@ function renderAdminSelections() {
 ========================================================= */
 
 function bindAdmin() {
-
   $("#loginForm")?.addEventListener(
     "submit",
     async event => {
@@ -1610,7 +1621,6 @@ function bindAdmin() {
         );
 
       }
-
     }
   );
 
@@ -1642,7 +1652,6 @@ function bindAdmin() {
         );
 
       }
-
     }
   );
 
@@ -1652,7 +1661,6 @@ function bindAdmin() {
 }
 
 function bindPlayerAdmin() {
-
   $("#playerForm")?.addEventListener(
     "submit",
     async event => {
@@ -1709,9 +1717,8 @@ function bindPlayerAdmin() {
             method: "POST",
 
             body: JSON.stringify({
-              id: Number(
-                form.get("id")
-              ),
+              id:
+                form.get("id"),
 
               nick:
                 form.get("nick"),
@@ -1747,7 +1754,6 @@ function bindPlayerAdmin() {
         );
 
       }
-
     }
   );
 
@@ -1797,15 +1803,12 @@ function bindPlayerAdmin() {
             );
 
           }
-
         }
       );
-
     });
 }
 
 function bindTeamAdmin() {
-
   $("#teamForm")?.addEventListener(
     "submit",
     async event => {
@@ -1851,7 +1854,6 @@ function bindTeamAdmin() {
         );
 
       }
-
     }
   );
 
@@ -1901,15 +1903,12 @@ function bindTeamAdmin() {
             );
 
           }
-
         }
       );
-
     });
 }
 
 function bindSelectionAdmin() {
-
   const form =
     $("#selectionForm");
 
@@ -1974,7 +1973,6 @@ function bindSelectionAdmin() {
         );
 
       }
-
     }
   );
 
@@ -2024,10 +2022,8 @@ function bindSelectionAdmin() {
             );
 
           }
-
         }
       );
-
     });
 }
 
