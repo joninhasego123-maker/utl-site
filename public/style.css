@@ -44,6 +44,7 @@ button {
 .sidebar {
   width: 250px;
   min-height: 100vh;
+
   position: fixed;
   left: 0;
   top: 0;
@@ -60,7 +61,8 @@ button {
 
 .brand {
   min-height: 92px;
-  padding: 18px 18px;
+
+  padding: 18px;
 
   display: flex;
   align-items: center;
@@ -83,10 +85,10 @@ button {
 .brand-logo img {
   width: 52px;
   height: 52px;
+
   object-fit: contain;
 
   background: transparent;
-  mix-blend-mode: normal;
 }
 
 .brand-fallback {
@@ -109,22 +111,25 @@ button {
 .brand-text {
   display: flex;
   flex-direction: column;
+
   line-height: 1;
 }
 
 .brand-text strong {
   font-size: 16px;
   font-weight: 900;
+
   letter-spacing: 0.5px;
 }
 
 .brand-text span {
   margin-top: 5px;
 
+  color: #888888;
+
   font-size: 11px;
   font-weight: 700;
 
-  color: #888888;
   letter-spacing: 0.8px;
 }
 
@@ -153,6 +158,7 @@ button {
   color: #8e8e8e;
 
   text-align: left;
+
   font-weight: 700;
 
   transition:
@@ -202,6 +208,7 @@ button {
 .sidebar-bottom small {
   font-size: 9px;
   font-weight: 800;
+
   letter-spacing: 1px;
 }
 
@@ -284,6 +291,7 @@ button {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+
   gap: 20px;
 }
 
@@ -309,17 +317,36 @@ button {
 .players-groups {
   display: flex;
   flex-direction: column;
+
   gap: 12px;
 }
 
 .player-class {
   overflow: hidden;
 
-  border: 1px solid #202020;
+  border: 1px solid #252525;
   border-radius: 14px;
 
-  background: #0f0f0f;
+  /*
+    A cor de cada Tier fica transparente.
+    A cor ocupa o bloco inteiro do Tier.
+  */
+
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(
+        in srgb,
+        var(--tier-color) 15%,
+        #0d0d0d
+      ),
+      #0d0d0d
+    );
 }
+
+/*
+  Header do Tier.
+*/
 
 .player-class-header {
   min-height: 54px;
@@ -329,52 +356,159 @@ button {
 
   padding: 0 18px;
 
-  background: #141414;
+  background:
+    color-mix(
+      in srgb,
+      var(--tier-color) 22%,
+      #141414
+    );
 
-  cursor: pointer;
+  border-bottom: 1px solid
+    color-mix(
+      in srgb,
+      var(--tier-color) 35%,
+      #252525
+    );
+
   user-select: none;
 }
 
 .player-class-header strong {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 900;
 }
 
-.player-class-content {
-  display: none;
-}
+/*
+  Não existem mais categorias fecháveis.
+*/
 
-.player-class.open .player-class-content {
+.player-class-content {
   display: block;
 }
 
 /* =========================================================
-   TABLE
+   TIER COLORS
+========================================================= */
+
+.player-tier-X {
+  --tier-color: #6a1b9a;
+}
+
+.player-tier-S {
+  --tier-color: #1565c0;
+}
+
+.player-tier-A {
+  --tier-color: #c62828;
+}
+
+.player-tier-B {
+  --tier-color: #ef6c00;
+}
+
+.player-tier-C {
+  --tier-color: #f9a825;
+}
+
+.player-tier-D {
+  --tier-color: #616161;
+}
+
+/* =========================================================
+   TABLE SCROLL
+========================================================= */
+
+/*
+  No celular, somente a tabela rola para o lado.
+  A página não quebra.
+*/
+
+.players-table-scroll {
+  width: 100%;
+  max-width: 100%;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  -webkit-overflow-scrolling: touch;
+
+  scrollbar-width: thin;
+}
+
+.players-table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.players-table-scroll::-webkit-scrollbar-track {
+  background: #0b0b0b;
+}
+
+.players-table-scroll::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 10px;
+}
+
+/* =========================================================
+   GLOBAL PLAYER TABLE
 ========================================================= */
 
 .players-table {
-  min-width: 760px;
+  width: max-content;
+  min-width: 100%;
 
-  border: 1px solid #242424;
+  border: 1px solid #292929;
   border-radius: 10px;
 
   overflow: hidden;
 
-  background: #0d0d0d;
+  background: rgba(8, 8, 8, 0.55);
 }
+
+/*
+  USER ID
+  USERNAME
+  TIER
+  OVERALL
+  TEAM
+*/
+
+.players-table:not(.club-players-table)
+  .players-table-head,
+.players-table:not(.club-players-table)
+  .player-row {
+
+  grid-template-columns:
+    150px
+    minmax(220px, 1fr)
+    100px
+    120px
+    minmax(220px, 1fr);
+}
+
+/* =========================================================
+   CLUB PLAYER TABLE
+========================================================= */
+
+.club-players-table
+  .players-table-head,
+.club-players-table
+  .player-row {
+
+  grid-template-columns:
+    150px
+    minmax(220px, 1fr)
+    100px
+    130px
+    150px;
+}
+
+/* =========================================================
+   TABLE HEADER
+========================================================= */
 
 .players-table-head,
 .player-row {
   display: grid;
-
-  grid-template-columns:
-    90px
-    minmax(180px, 1.7fr)
-    90px
-    minmax(160px, 1.2fr)
-    120px
-    120px
-    150px;
 
   align-items: center;
 }
@@ -382,11 +516,11 @@ button {
 .players-table-head {
   min-height: 46px;
 
-  background: #151515;
+  background: rgba(21, 21, 21, 0.82);
 
-  border-bottom: 1px solid #252525;
+  border-bottom: 1px solid #292929;
 
-  color: #777777;
+  color: #858585;
 
   font-size: 10px;
   font-weight: 900;
@@ -401,17 +535,23 @@ button {
   padding: 11px 14px;
 
   text-align: left;
+
+  border-right: 1px solid #292929;
 }
 
-.players-table-head span:not(:last-child),
-.player-row > span:not(:last-child) {
-  border-right: 1px solid #282828;
+.players-table-head span:last-child,
+.player-row > span:last-child {
+  border-right: 0;
 }
+
+/*
+  Linhas horizontais contínuas.
+*/
 
 .player-row {
   min-height: 56px;
 
-  border-bottom: 1px solid #202020;
+  border-bottom: 1px solid #242424;
 
   color: #eeeeee;
 
@@ -423,22 +563,12 @@ button {
 }
 
 .player-row:hover {
-  background: #121212;
+  background: rgba(255, 255, 255, 0.025);
 }
 
-.player-nick {
-  min-width: 0;
-
-  overflow-wrap: anywhere;
-  word-break: break-word;
-
-  font-weight: 800;
-}
-
-/*
-  IDs grandes podem quebrar sem empurrar
-  a coluna NICK para fora.
-*/
+/* =========================================================
+   PLAYER ID
+========================================================= */
 
 .player-id {
   min-width: 0;
@@ -450,53 +580,78 @@ button {
 }
 
 /* =========================================================
-   CLASS BADGES
+   PLAYER USERNAME
+========================================================= */
+
+.player-nick {
+  min-width: 0;
+
+  overflow-wrap: anywhere;
+  word-break: break-word;
+
+  font-weight: 800;
+}
+
+/* =========================================================
+   TIER
+========================================================= */
+
+/*
+  Sem quadradinho.
+  O Tier aparece apenas como texto.
+*/
+
+.player-tier {
+  font-weight: 900;
+
+  letter-spacing: 0.3px;
+}
+
+/* Cores do texto do Tier */
+
+.player-tier-X .player-tier {
+  color: #c77dff;
+}
+
+.player-tier-S .player-tier {
+  color: #64a8ff;
+}
+
+.player-tier-A .player-tier {
+  color: #ff7070;
+}
+
+.player-tier-B .player-tier {
+  color: #ff9b45;
+}
+
+.player-tier-C .player-tier {
+  color: #ffd84d;
+}
+
+.player-tier-D .player-tier {
+  color: #bdbdbd;
+}
+
+/* =========================================================
+   OLD CLASS BADGE DISABLED
 ========================================================= */
 
 .class-badge {
-  min-width: 38px;
-  height: 26px;
+  background: transparent !important;
+  color: inherit !important;
 
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  min-width: auto;
+  height: auto;
 
-  padding: 0 8px;
+  display: inline;
 
-  border-radius: 7px;
+  padding: 0;
 
-  font-size: 11px;
+  border-radius: 0;
+
+  font-size: inherit;
   font-weight: 900;
-}
-
-.class-X {
-  background: #ffffff;
-  color: #000000;
-}
-
-.class-S {
-  background: #b71c1c;
-  color: #ffffff;
-}
-
-.class-A {
-  background: #ef6c00;
-  color: #ffffff;
-}
-
-.class-B {
-  background: #f9a825;
-  color: #111111;
-}
-
-.class-C {
-  background: #2e7d32;
-  color: #ffffff;
-}
-
-.class-D {
-  background: #616161;
-  color: #ffffff;
 }
 
 /* =========================================================
@@ -508,6 +663,7 @@ button {
 
   display: flex;
   align-items: center;
+
   gap: 8px;
 }
 
@@ -554,6 +710,7 @@ button {
 
   display: flex;
   align-items: center;
+
   gap: 14px;
 
   padding: 16px;
@@ -564,7 +721,11 @@ button {
   background:
     linear-gradient(
       135deg,
-      var(--club-bg, #151515),
+      color-mix(
+        in srgb,
+        var(--club-bg, #151515) 70%,
+        #0d0d0d
+      ),
       #0d0d0d
     );
 
@@ -577,6 +738,7 @@ button {
 
 .club-card:hover {
   transform: translateY(-2px);
+
   border-color: #444444;
 }
 
@@ -613,7 +775,6 @@ button {
   border-radius: 50%;
 
   background: #222222;
-
   color: #ffffff;
 
   font-size: 18px;
@@ -625,6 +786,7 @@ button {
 
   display: flex;
   flex-direction: column;
+
   gap: 5px;
 }
 
@@ -660,6 +822,10 @@ button {
   width: 100%;
 }
 
+/* =========================================================
+   BACK BUTTON
+========================================================= */
+
 .back-btn {
   margin-bottom: 16px;
 
@@ -679,15 +845,17 @@ button {
   background: #1b1b1b;
 }
 
-.club-detail-header {
-  min-height: 130px;
+/* =========================================================
+   CLUB DETAIL HEADER
+========================================================= */
 
-  display: flex;
-  align-items: center;
-  gap: 20px;
+.club-detail-header {
+  width: 100%;
+
+  min-height: 115px;
 
   margin-bottom: 18px;
-  padding: 20px;
+  padding: 16px 20px;
 
   border: 1px solid #292929;
   border-radius: 18px;
@@ -695,14 +863,31 @@ button {
   background:
     linear-gradient(
       135deg,
-      var(--club-bg, #151515),
+      color-mix(
+        in srgb,
+        var(--club-bg, #151515) 28%,
+        #0c0c0c
+      ),
       #0c0c0c
     );
 }
 
+/*
+  Logo + nome + quantidade ficam juntos.
+*/
+
+.club-detail-main {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 18px;
+}
+
 .club-detail-logo {
-  width: 82px;
-  height: 82px;
+  width: 76px;
+  height: 76px;
 
   flex: 0 0 auto;
 
@@ -719,43 +904,59 @@ button {
   border-radius: 50%;
 
   background: #222222;
-
   color: #ffffff;
 
-  font-size: 28px;
+  font-size: 27px;
   font-weight: 900;
 }
 
-.club-detail-header h1 {
-  margin: 0 0 7px;
+.club-detail-info {
+  min-width: 0;
+
+  flex: 1;
+}
+
+.club-detail-info h1 {
+  margin: 0;
+
+  overflow-wrap: anywhere;
+  word-break: break-word;
 
   font-size: 25px;
   font-weight: 900;
 }
 
-.club-detail-header p {
-  margin: 0;
+.club-detail-count {
+  flex: 0 0 auto;
 
-  color: #888888;
+  color: #ffffff;
 
-  font-size: 12px;
+  font-size: 17px;
+  font-weight: 900;
 }
+
+/* =========================================================
+   CLUB PLAYER LIST
+========================================================= */
 
 .club-detail-players {
   width: 100%;
 }
 
-/*
-  Fundo da lista usa a cor cadastrada
-  no Time / Seleção.
-*/
-
 .club-player-list {
-  background: var(--club-bg, #151515);
-
-  border-radius: 16px;
+  width: 100%;
 
   padding: 12px;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+
+  background:
+    color-mix(
+      in srgb,
+      var(--club-bg, #151515) 18%,
+      #0d0d0d
+    );
 }
 
 /* =========================================================
@@ -837,12 +1038,14 @@ button {
 form {
   display: flex;
   flex-direction: column;
+
   gap: 13px;
 }
 
 form label {
   display: flex;
   flex-direction: column;
+
   gap: 6px;
 
   color: #aaaaaa;
@@ -923,6 +1126,7 @@ select:focus {
 .admin-list {
   display: flex;
   flex-direction: column;
+
   gap: 8px;
 
   margin-top: 20px;
@@ -934,6 +1138,7 @@ select:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   gap: 12px;
 
   padding: 12px;
@@ -974,6 +1179,7 @@ select:focus {
 .selection-players {
   display: flex;
   flex-direction: column;
+
   gap: 7px;
 }
 
@@ -982,6 +1188,7 @@ select:focus {
 
   display: flex;
   flex-direction: column;
+
   gap: 6px;
 
   overflow-y: auto;
@@ -1089,6 +1296,7 @@ select:focus {
   font-weight: 700;
 
   opacity: 0;
+
   transform: translateY(12px);
 
   pointer-events: none;
@@ -1102,6 +1310,7 @@ select:focus {
 
 #toast.show {
   opacity: 1;
+
   transform: translateY(0);
 }
 
@@ -1126,11 +1335,13 @@ select:focus {
 
   .main {
     width: 100%;
+
     margin-left: 0;
   }
 
   .hamb {
     display: inline-flex;
+
     align-items: center;
     justify-content: center;
   }
@@ -1154,7 +1365,6 @@ select:focus {
   .club-list {
     grid-template-columns: 1fr;
   }
-
 }
 
 /* =========================================================
@@ -1183,45 +1393,99 @@ select:focus {
     font-size: 23px;
   }
 
-  .club-detail-header {
-    min-height: 105px;
+  /* =======================================================
+     PLAYER TABLE MOBILE
+  ======================================================= */
 
-    padding: 14px;
-    gap: 13px;
-  }
-
-  .club-detail-logo {
-    width: 62px;
-    height: 62px;
-  }
-
-  .club-detail-header h1 {
-    font-size: 19px;
-  }
-
-  .club-player-list {
-    padding: 7px;
-    border-radius: 12px;
+  .players-table-scroll {
+    margin: 0;
   }
 
   .players-table {
-    min-width: 680px;
+    min-width: 760px;
   }
 
-  .players-table-head,
-  .player-row {
+  .players-table:not(.club-players-table)
+    .players-table-head,
+  .players-table:not(.club-players-table)
+    .player-row {
+
     grid-template-columns:
-      85px
-      minmax(170px, 1.7fr)
-      80px
+      150px
+      220px
+      90px
       110px
-      135px;
+      210px;
+  }
+
+  .club-players-table
+    .players-table-head,
+  .club-players-table
+    .player-row {
+
+    grid-template-columns:
+      140px
+      210px
+      90px
+      120px
+      140px;
   }
 
   .players-table-head span,
   .player-row > span {
     padding: 10px 11px;
   }
+
+  /* =======================================================
+     TIER
+  ======================================================= */
+
+  .player-class-header {
+    min-height: 48px;
+
+    padding: 0 14px;
+  }
+
+  .player-class-header strong {
+    font-size: 15px;
+  }
+
+  /* =======================================================
+     CLUB DETAIL
+  ======================================================= */
+
+  .club-detail-header {
+    min-height: 92px;
+
+    padding: 12px;
+  }
+
+  .club-detail-main {
+    gap: 11px;
+  }
+
+  .club-detail-logo {
+    width: 58px;
+    height: 58px;
+  }
+
+  .club-detail-info h1 {
+    font-size: 18px;
+  }
+
+  .club-detail-count {
+    font-size: 14px;
+  }
+
+  .club-player-list {
+    padding: 7px;
+
+    border-radius: 12px;
+  }
+
+  /* =======================================================
+     ADMIN
+  ======================================================= */
 
   .admin-card {
     padding: 15px;
@@ -1231,6 +1495,10 @@ select:focus {
     align-items: flex-start;
   }
 
+  /* =======================================================
+     TOAST
+  ======================================================= */
+
   #toast {
     left: 14px;
     right: 14px;
@@ -1238,5 +1506,33 @@ select:focus {
 
     max-width: none;
   }
+}
 
+/* =========================================================
+   EXTRA SMALL MOBILE
+========================================================= */
+
+@media (max-width: 380px) {
+
+  .page-content {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .club-detail-main {
+    gap: 8px;
+  }
+
+  .club-detail-logo {
+    width: 50px;
+    height: 50px;
+  }
+
+  .club-detail-info h1 {
+    font-size: 16px;
+  }
+
+  .club-detail-count {
+    font-size: 12px;
+  }
 }
