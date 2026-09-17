@@ -393,10 +393,6 @@ button {
 
   display: block;
 
-  /*
-    O conteúdo encosta diretamente
-    no cabeçalho do Tier.
-  */
   margin: 0;
   padding: 0;
 }
@@ -482,6 +478,8 @@ button {
 
 /* =========================================================
    GLOBAL PLAYER TABLE
+   6 COLUNAS:
+   ID | USERNAME | TIER | OVERALL | WAGE | TEAM
 ========================================================= */
 
 .players-table:not(.club-players-table)
@@ -494,11 +492,14 @@ button {
     minmax(220px, 1fr)
     100px
     120px
+    130px
     minmax(220px, 1fr);
 }
 
 /* =========================================================
    CLUB PLAYER TABLE
+   5 COLUNAS:
+   ID | NICK | CLASS | OVERALL | WAGE
 ========================================================= */
 
 .club-players-table
@@ -569,10 +570,6 @@ button {
 
   font-size: 13px;
 
-  /*
-    Faz o fundo do Tier continuar
-    pelas linhas sem deixar espaços.
-  */
   background: transparent;
 }
 
@@ -1390,6 +1387,8 @@ select:focus {
 
   /* =======================================================
      PLAYER TABLE MOBILE
+     6 COLUNAS:
+     ID | USERNAME | TIER | OVERALL | WAGE | TEAM
   ======================================================= */
 
   .players-table-scroll {
@@ -1397,7 +1396,7 @@ select:focus {
   }
 
   .players-table {
-    min-width: 760px;
+    min-width: 1020px;
   }
 
   .players-table:not(.club-players-table)
@@ -1410,8 +1409,14 @@ select:focus {
       220px
       90px
       110px
+      130px
       210px;
   }
+
+  /* =======================================================
+     CLUB TABLE MOBILE
+     5 COLUNAS
+  ======================================================= */
 
   .club-players-table
     .players-table-head,
